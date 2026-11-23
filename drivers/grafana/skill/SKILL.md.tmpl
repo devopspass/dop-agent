@@ -1,0 +1,53 @@
+---
+name: ${{skill.name}}
+description: "Use when: ANY Grafana read or action on the ${{config.title}} instance (`${{instance.name}}`, ${{config.base_url}}) — dashboards, queries, alerts, data sources, and watchers."
+---
+
+# ${{skill.name}} — Grafana `${{instance.name}}` (${{config.base_url}})
+
+Always run the CLI with the instance flag (several Grafana servers may be configured, each has its own skill):
+
+`${{driver.python}} ${{driver.cli}} --instance ${{instance.name}} <command>`
+
+The token comes from the integration config (or the OAuth session); never print or echo it. If the user means another Grafana, use that instance's skill. Output is compact JSON; `--max-chars N` (default 6000, 0 = unlimited) cuts long output.
+
+## Reads
+| Need | Command |
+|---|---|
+| Connection check (config, auth, org) | `test` |
+| Who is the token | `whoami` |
+| Find dashboards / folders | `search [QUERY] [--type dash-db\|dash-folder] [--tag T] [--folder UID] [--limit 30]` |
+| Dashboard summary (title, folder, version, variables, panels with queries) | `dashboard get UID` (`--full` = whole JSON, big: save to `/tmp`) |
+| Version history | `dashboard versions UID` |
+| Folders | `folder list`, `folder get UID` |
+| Data sources | `datasources` |
+| Run a query through a data source | `query prom DS_UID 'EXPR' [--range 6h --step 60s]`, `query loki DS_UID '{app="x"} \|= "err"' [--range 1h --limit 50]` (instant for prom without `--range`) |
+| Alert instances | `alerts [--state firing\|pending\|normal\|all] [--limit 100]` |
+| What can this identity do | `permissions [--filter dashboards]` (check this before concluding "no write access": RBAC grants can exist while the org role is Viewer) |
+| Anything else | `api GET /api/... [--query k=v ...]` |
+
+To explain a panel: `dashboard get UID` shows its queries and data source uid, then run them with `query`.
+
+## Writes (dry run by default)
+`dashboard save --file F.json [UID] [--folder-uid F] [--overwrite] [--message M]`, `dashboard move UID --folder-uid F`, `dashboard delete UID`, `api POST|PUT|PATCH|DELETE /path [--data JSON|--data-file F]`. Without `--yes` they only print what would happen. The `dashboard save` file is the bare dashboard model (not the `/api/dashboards/db` wrapper).
+
+## Authentication
+${{config.title}} uses either a service account token or an OAuth proxy session. For OAuth instances: `auth status`, `auth authorize` (one-time browser consent via CDP; needs the SSO-signed-in browser and `websocket-client`), `auth refresh` (silent). A 401 from `test` on such an instance means run `auth authorize`.
+
+## Rules
+- **Don't explore**: everything is documented here; don't read the CLI source or hunt for script paths (use `-h` of a command if a flag is unclear).
+- **Writes change shared state**: show the user the dry run, name the instance (`${{instance.name}}`) and the target (dashboard uid/title, folder), and add `--yes` only after explicit approval. Prefer `dashboard save` without `--overwrite` first; with `--overwrite` fetch the current version beforehand so a rollback is possible.
+- Bound scans: `search` with `--folder`/`--tag`/`--limit`, queries with a short `--range`; don't dump whole dashboards or folders into context. Save big outputs to `/tmp` and grep.
+- If this identity lacks access to something the user's own login has, say so; don't hunt for other credentials.
+
+## Watchers
+Token-free script watches (no model turn until something changes): `watch_script(script="grafana_watch.py", integration="${{instance.name}}", watcher=<id>)`. Scripts live in `${{driver.watch_dir}}`, never invoke them by hand; validate with `dry_run=true` and report clearly whether it was only a dry run or really registered. Exit 0 silent / 200 changed / other = error; the first run is a silent baseline.
+
+| watcher id | Fires on | Leading args |
+|---|---|---|
+| `grafana-alerts-firing` 🔥 | alert instance newly firing | `alerts [--state firing\|pending\|normal] [--label k=v ...] [--rule SUBSTR] [--resolved] [--limit 200]` |
+| `grafana-dashboard-changed` 📊 | new version of a dashboard | `dashboard-changed (--uid U ... \| --folder F \| --tag T ...) [--limit 30]` |
+| `grafana-datasource-health` 🩺 | data source turned unhealthy / healthy again | `datasource-health [--uid U ...] [--limit 20]` |
+
+The leading mode is added automatically; pass only the filters in `args` (`dashboard-changed` needs at least one of `--uid/--folder/--tag`). `--resolved` also reports instances that stopped matching.
+Example: `watch_script(session_id=<id>, script="grafana_watch.py", watcher="grafana-alerts-firing", integration="${{instance.name}}", args=["--label","severity=critical"], schedule="cron:*/5 * * * *", prompt="new critical alert: check the dashboard and summarize", retries=3)`.

@@ -1,0 +1,51 @@
+/* Usage widget: header chips (#health-usage / #health-quota), thread-header
+   🧠 context / ♨ cache chips and the sidebar AIU suffix. See usage.js. */
+.uw-ico { filter: grayscale(1); }
+.uw-hov { position: relative; cursor: default; }
+.uw-hov:hover { color: var(--ct-fff,#fff); }
+.uw-pop {
+  display: none; position: absolute; top: 100%; left: 0; z-index: 30; width: 460px;
+  background: var(--slack-panel, var(--cb-222,#222)); border: 1px solid var(--slack-border);
+  border-radius: 6px; padding: 10px 12px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  color: var(--ct-fff,#fff); font-weight: 400; font-size: 12px; white-space: normal; text-align: left;
+}
+.uw-hov:hover > .uw-pop { display: block; }
+.uw-pop.uw-right { left: auto; right: 0; }
+.uw-pop.uw-sm { width: 340px; }
+.uw-pop h4 { margin: 0 0 6px; font-size: 12px; color: var(--ct-9aa0a6,#9aa0a6); text-transform: uppercase; letter-spacing: .04em; }
+.uw-pop h4.uw-nocaps { text-transform: none; letter-spacing: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.uw-pop table { width: 100%; border-collapse: collapse; margin: 4px 0 8px; }
+.uw-pop th, .uw-pop td { text-align: right; padding: 2px 6px; border-bottom: 1px solid var(--cb-2d3136,#2d3136); }
+.uw-pop th:first-child, .uw-pop td:first-child { text-align: left; max-width: 270px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.uw-pop th { color: var(--ct-9aa0a6,#9aa0a6); font-weight: 500; }
+.uw-pop a { color: var(--slack-link); text-decoration: none; }
+.uw-pop a:hover { text-decoration: underline; }
+.uw-muted { color: var(--ct-9aa0a6,#9aa0a6); }
+.uw-bar { height: 8px; background: var(--cb-2b2f33,#2b2f33); border-radius: 4px; overflow: hidden; margin: 4px 0; }
+.uw-bar > i { display: block; height: 100%; background: #4a9eff; }
+.uw-chart { display: flex; align-items: flex-end; gap: 2px; height: 70px; margin: 6px 0; }
+.uw-chart i { flex: 1; background: #4a9eff; min-height: 1px; border-radius: 1px 1px 0 0; }
+.uw-chart i.uw-today { background: #ecb22e; }
+.uw-row { display: flex; gap: 12px; align-items: center; }
+.uw-donut {
+  width: 64px; height: 64px; border-radius: 50%; flex-shrink: 0;
+  -webkit-mask: radial-gradient(circle 20px, transparent 98%, #000 100%);
+  mask: radial-gradient(circle 20px, transparent 98%, #000 100%);
+}
+.uw-leg span { display: block; }
+.uw-sw { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 5px; }
+.uw-tip { text-decoration: underline dotted #777; cursor: help; position: relative; }
+.uw-tip:hover::after {
+  content: attr(data-tip); position: absolute; left: 0; top: 130%; width: 240px; z-index: 50;
+  background: var(--cb-0f1113,#0f1113); border: 1px solid var(--cb-4a4f55,#4a4f55); border-radius: 5px; padding: 6px 8px;
+  color: var(--ct-e8e8e8,#e8e8e8); font-size: 11px; line-height: 1.4; white-space: normal; text-decoration: none;
+}
+.uw-quota-hi { color: var(--ct-d9a441,#d9a441); }
+.uw-quota-crit { color: var(--ct-e0707a,#e0707a); }
+.uw-heavy { color: var(--ct-ecb22e,#ecb22e); font-weight: 600; }
+.thread-meta .uw-sep { color: #555; margin: 0 5px; }
+
+.uw-tabs { display: flex; gap: 4px; margin-bottom: 8px; }
+.uw-range-btn { background: none; border: 1px solid var(--slack-border); border-radius: 4px; color: var(--ct-ccc,#ccc); font-size: 11px; padding: 2px 10px; cursor: pointer; }
+.uw-range-btn:hover { color: var(--ct-fff,#fff); background: rgba(var(--ov,255,255,255), 0.1); }
+.uw-range-btn.uw-active { color: var(--ct-fff,#fff); background: rgba(var(--ov,255,255,255), 0.16); border-color: var(--cb-6b7075,#6b7075); }

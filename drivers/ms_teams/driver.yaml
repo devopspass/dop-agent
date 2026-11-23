@@ -1,0 +1,49 @@
+# Package driver: Microsoft Teams. CLI + watcher scripts + skill template; no polling.
+# Per-instance values (config.yaml -> integrations.<name>.options) are injected into the skill, CLI args and
+# watcher env through ${{config.<option>}}. Off by default: nothing is rendered until an instance is enabled.
+id: ms_teams
+title: Microsoft Teams
+type: package
+icon: teams
+auth:
+  types:
+    cdp_edge: { title: "Teams web tab in Edge/Chrome via CDP (no secret)", fields: {} }
+options:
+  cdp_url:   { type: string, default: "http://localhost:9222", required: true, pattern: '(?i)https?://[a-z0-9._\-]+(:[0-9]{1,5})?/?',
+               help: "Browser remote-debugging endpoint of the profile signed in to this account (http://host:port)" }
+  account:   { type: string, required: true, pattern: '[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+',
+               help: "Signed-in account (email/UPN) this instance acts as" }
+  tenant_id: { type: string, pattern: '(?i)([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?',
+               help: "AD tenant GUID; filled by the Test button; used to match Teams links to this instance" }
+  title:     { type: string, pattern: '[^"`$\\<>]{0,80}', help: "Short label for lists and the skill description (default: the account)" }
+tenant: { option: tenant_id }
+cli:
+  entry: cli/cli.py
+  global_args: ["--cdp-url", "${{config.cdp_url}}", "--account", "${{config.account}}"]
+env:
+  TEAMS_CDP_URL: "${{config.cdp_url}}"
+  TEAMS_ACCOUNT: "${{config.account}}"
+skill:
+  template: skill/SKILL.md.tmpl
+  name: ms-teams
+watchers:
+  teams-messages:       { script: teams_watch.py, args: [messages], emoji: "💬", slack_emoji: ":speech_balloon:", title: New chat messages }
+  teams-mentions:       { script: teams_watch.py, args: [messages, --mentions-me], emoji: "📣", slack_emoji: ":mega:", title: "@mentions of me" }
+  teams-files:          { script: teams_watch.py, args: [messages, --files, --kind, any], emoji: "📎", slack_emoji: ":paperclip:", title: Files shared in chats }
+  teams-transcript:     { script: teams_watch.py, args: [transcript], emoji: "📝", slack_emoji: ":memo:", title: Call transcript or recording ready }
+  teams-meeting-soon:   { script: teams_watch.py, args: [meeting-soon], emoji: "📅", slack_emoji: ":date:", title: Meeting starting soon }
+  teams-meeting-started: { script: teams_watch.py, args: [meeting-started], emoji: "▶️", slack_emoji: ":arrow_forward:", title: Meeting started }
+  teams-meeting-new:    { script: teams_watch.py, args: [meeting-created], emoji: "🆕", slack_emoji: ":new:", title: New meeting on the calendar }
+  teams-meeting-changed: { script: teams_watch.py, args: [meeting-changed], emoji: "🗓️", slack_emoji: ":spiral_calendar_pad:", title: Meeting cancelled or rescheduled }
+kinds:
+  chat:
+    url_match: '^https://teams\.(?:microsoft\.com|cloud\.microsoft)/l/chat/(?P<chat>[^/]+)(?:/\d+)?/?$'
+    url_template: 'https://teams.microsoft.com/l/chat/{chat}/0'
+    card: { fields: [from, last_message], icon: teams, label: 'Teams chat' }
+  message:
+    url_match: '^https://teams\.(?:microsoft\.com|cloud\.microsoft)/l/message/(?P<chat>[^/]+)/(?P<msg>\d+)/?$'
+    card: { fields: [time], icon: teams, label: 'Teams message' }
+  meeting:
+    url_match: '^https://teams\.(?:microsoft\.com|cloud\.microsoft)/l/meetup-join/(?P<join>.+)$'
+    card: { fields: [start, organizer], icon: teams, label: 'Teams meeting' }
+version: 1

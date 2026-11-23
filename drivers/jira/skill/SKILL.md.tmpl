@@ -1,0 +1,47 @@
+---
+name: ${{skill.name}}
+description: "Use when: ANY Jira read or write on ${{config.base_url}} (${{config.title}}) — tickets, JQL, sprints, comments, transitions, and watchers."
+---
+
+# ${{skill.name}} — Jira at ${{config.base_url}} (${{config.title}})
+
+Integration instance: `${{instance.name}}`. Always run the CLI with the instance flags (the API token is read from a file by the CLI; never print or echo it):
+
+`${{driver.python}} ${{driver.cli}} --base-url ${{config.base_url}} --email ${{config.email}} --token-file ${{config.token_file}} <command>`
+
+If the user means another Jira site, use that site's own skill instead.
+
+## Commands
+| Need | Command |
+|---|---|
+| Ticket (status, assignee, SP, sprint, epic, links, desc, last N comments) | `ticket KEY [--comments 3] [--desc 300\|0\|-1] [--width 200]` |
+| JQL, one line per issue (cols status, SP; footer = count, SP total, per-status counts) | `search "<JQL>" [--fields status,sp,sprint,epic,assignee,<field id>] [--limit 30] [--all] [--width 70\|0] [--links] [--group-by assignee\|status\|sprint\|epic]` — `--links` prints browse URLs; `--all` pages through everything, ignoring `--limit` |
+| My sprint | `search "assignee = currentUser() AND sprint in openSprints() ORDER BY Rank ASC"` |
+| Team view | `search "project = <KEY> AND sprint in openSprints() AND <team filter>" --group-by assignee` (count + SP per person, `unassigned` shown explicitly). Without a team filter an open sprint can be huge: always narrow it |
+| Comment (md subset: paragraphs, `- ` bullets, ``` fences, **b**, `c`, [t](url)) | `comment KEY "text"` or `--file f.md` |
+| Transitions | `transition KEY --list`; `transition KEY "<status>" [--chain] [--dry-run]` |
+| Assign / SP / link | `assign KEY me\|"name"\|none`; `sp KEY 3`; `link KEY1 <link type> KEY2` (KEY1 = outward issue) |
+| Create | `create --project <KEY> --type Task --summary S --desc D [--parent KEY --labels a,b --assignee me --sp 2 --sprint ID]` |
+| Anything else | `raw GET\|POST\|PUT\|PATCH\|DELETE /rest/api/3/... [-q k=v] [--data JSON\|--data-file f] [--jq a.b[*].c] [--max 4000]` |
+| Check the connection (config, auth, fields) | `test` |
+
+## Rules
+- **Don't explore**: every command and watcher flag is documented here; never run `--help`, `ls`/`find` for scripts, or read the watcher source. Watcher scripts are only run through `watch_script` (they live in `${{driver.watch_dir}}`).
+- **Writes are real actions on ${{config.base_url}}** (`comment`, `transition`, `assign`, `sp`, `link`, `create`, writing `raw`): only when the user explicitly asked; preview with `--dry-run`, state the ticket key(s) and exact text, writers print only `OK <id>`.
+- `transition` matches transition id/name/target status on the live list. If the target isn't directly available, add `--chain` (max 3 hops, follows `Selected for sprint` -> `Ready to progress` where the workflow has them, re-resolves every hop, verifies the final status). Transition ids differ per status/project: never hardcode them.
+- Story-points and sprint field ids come from the instance options `sp_field`/`sprint_field` when set, else are auto-detected by name/schema (one extra request).
+- Richer ADF (tables, panels, mentions) or odd endpoints: `raw ... --data-file`.
+- Bound scans: use JQL filters, `--limit`; save big outputs to `/tmp` and summarize instead of pasting them whole.
+
+## Watchers (wake the session on change; do not poll Jira yourself)
+- **One ticket**: `watch_script(session_id=<id>, script="jira_watch.py", watcher="jira-ticket", integration="${{instance.name}}", args=["<ISSUE-123>"], schedule="cron:*/5 * * * *", prompt="...", retries=3)`; optional `"--match", "<regex>", "--author", "<name part>"` filter comments. The bot has no built-in `ticket` watch type any more.
+- **JQL result sets** — `watch_script` with `script="jira_watch.py"`, `integration="${{instance.name}}"` (injects this site/account) and `watcher=<id>` (picks the icon in the watchers list). Read-only: exit 0 silent / 200 changed / other = error; the first run is a silent baseline (issues already matching are not reported); wake text = key, `[new]`/`[updated]`, status, assignee, summary, link. Schedule e.g. `cron:*/10 * * * *`, `retries=3`.
+
+| watcher id | Fires on | Leading args |
+|---|---|---|
+| `jira-ticket` 🎫 | one issue: new comments, status transitions, other field changes | `ticket` (put the issue key right after it); flags `--match REGEX`, `--author NAME` filter comments |
+| `jira-assigned` 📥 | unresolved issues assigned to me that are new to the set or updated | `jql "assignee = currentUser() AND resolution = Unresolved"` |
+| `jira-jql` 🔎 | issues matching your JQL that are new or updated | `jql` (put the JQL right after it in `args`) |
+
+The leading args of the chosen watcher are added automatically; pass only extra flags (and, for `jira-jql`, the JQL string as the first `args` item): `--new-only` (ignore updates of already-seen issues), `--limit N=30` (max 100). Example: `watch_script(session_id=<id>, script="jira_watch.py", watcher="jira-jql", integration="${{instance.name}}", args=["project = <KEY> AND status = Blocked", "--new-only"], schedule="cron:*/10 * * * *", prompt="new blocked issue: summarize", retries=3)`.
+To validate a watch use `watch_script(..., dry_run=true)` and report clearly whether it was only a dry run or really registered.

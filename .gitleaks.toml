@@ -1,0 +1,19 @@
+title = "dop-agent gitleaks config"
+
+[extend]
+useDefault = true
+
+# Synthetic credentials used by tests and docs; none of them is a real secret.
+[allowlist]
+description = "known test fixtures and placeholders"
+regexes = [
+  '''xoxb-PLANTED[A-Za-z0-9-]*''',
+  '''xapp-PLANTED[A-Za-z0-9-]*''',
+  '''glpat-abcdefghij[A-Za-z0-9_-]*''',
+  '''ghp_x{6,}''',
+]
+paths = [
+  '''^tests/''',
+  '''^ui_tests/''',
+  '''^ui_demos/''',
+]

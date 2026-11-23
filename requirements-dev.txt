@@ -1,0 +1,6 @@
+# Test / development dependencies.
+-r requirements.txt
+pytest==9.2.0
+pytest-asyncio==1.5.0
+playwright>=1.49
+pytest-playwright>=0.6

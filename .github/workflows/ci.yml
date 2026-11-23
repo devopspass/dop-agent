@@ -1,0 +1,99 @@
+# Repo root == the dop-agent folder. Third-party actions are pinned by version tag; pinning to a full commit SHA
+# is optional extra hardening (dependabot keeps both styles up to date).
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff check .
+
+  unit:
+    name: unit (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - name: Install dependencies (core + dev)
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Run unit tests
+        run: python -m pytest tests/
+
+  render:
+    name: render
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - name: Install system libraries (WeasyPrint)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends libcairo2 libpango-1.0-0 libpangoft2-1.0-0 \
+            libgdk-pixbuf-2.0-0 libharfbuzz0b shared-mime-info fonts-dejavu-core fonts-noto-color-emoji
+      - name: Install dependencies (core + dev + render extra)
+        run: pip install -r requirements.txt -r requirements-dev.txt -r requirements-render.txt
+      - name: Run render tests
+        run: python -m pytest tests/test_render_markdown.py tests/test_render_tables.py -rs
+
+  # Informational until the suite is green: ~40+ UI tests currently fail (stale selectors after the vendored
+  # highlight.js change, unread/filter flows); see the release notes of the CI change.
+  ui-tests:
+    name: ui-tests
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - name: Install dependencies (core + dev)
+        run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Install Playwright Chromium
+        run: python -m playwright install --with-deps chromium
+      - name: Run UI tests
+        run: python -m pytest ui_tests/ -p no:cacheprovider
+
+  docker-build:
+    name: docker-build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Build image (core only)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: dop-agent:ci

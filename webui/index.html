@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>DOP Agent</title>
+<meta name="color-scheme" content="dark" />
+<meta name="theme-color" content="#1a1d21" />
+<link rel="icon" type="image/png" href="/static/icons/logo.png" />
+<link rel="stylesheet" href="/static/style.css" />
+<link rel="stylesheet" href="/static/ideas.css" />
+<link rel="stylesheet" href="/static/ask.css" />
+<link rel="stylesheet" href="/static/actions.css" />
+<link rel="stylesheet" href="/static/mermaid.css" />
+<link rel="stylesheet" href="/static/chart.css" />
+<link rel="stylesheet" href="/static/usage.css" />
+<link rel="stylesheet" href="/static/settings.css" />
+<link rel="stylesheet" href="/static/light.css" />
+<script src="/static/csrf.js"></script>
+<script src="/static/theme.js"></script>
+<link rel="stylesheet" href="/static/vendor/github-dark.min.css" />
+<script src="/static/vendor/marked.umd.js"></script>
+<script src="/static/vendor/purify.min.js"></script>
+<script src="/static/vendor/emoji.js"></script>
+<script src="/static/vendor/highlight.min.js"></script>
+</head>
+<body>
+  <div id="health-strip" class="health-strip" title="Bot health status">
+    <span class="health-item health-item-hoverable" id="health-adapters">
+      <span class="health-dot"></span>Adapters
+      <div class="mcp-status-popover" id="adapters-status-popover" hidden></div>
+    </span>
+    <span class="health-item health-item-hoverable" id="health-mcp">
+      <span class="health-dot"></span>MCP
+      <div class="mcp-status-popover" id="mcp-status-popover" hidden></div>
+    </span>
+    <span class="health-item health-item-clickable" id="health-watches" title="Watchers: loading…">
+      <span class="health-dot"></span>Watchers<span class="health-item-count" id="health-watches-count"></span>
+    </span>
+    <span class="health-item" id="health-live"><span class="health-dot"></span>Live</span>
+    <span class="health-item" id="health-uptime">Uptime: —</span>
+    <span class="health-item" id="health-version">v—</span>
+    <span class="health-item uw-hov" id="health-usage" title="" style="display:none"></span>
+    <span class="health-item uw-hov" id="health-quota" title="" style="display:none"></span>
+    <span class="health-strip-spacer"></span>
+    <button type="button" id="theme-toggle" class="health-strip-link" title="Switch theme" aria-label="Switch theme">🌙 Dark</button>
+    <a href="#" id="settings-link" class="health-strip-link">Settings</a>
+  </div>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar">
+      <button id="sidebar-collapse-btn" class="sidebar-collapse-btn" title="Collapse sidebar">‹</button>
+      <div class="sidebar-inner">
+        <div class="sidebar-header">
+          <img src="/static/icons/logo.png" alt="" class="sidebar-logo" />
+          <div class="sidebar-modes" id="sidebar-modes">
+            <button type="button" class="sidebar-mode active" data-mode="sessions">Sessions</button>
+            <button type="button" class="sidebar-mode" data-mode="inbox">Inbox <span class="inbox-badge" id="inbox-badge" style="display:none"></span></button>
+          </div>
+          <button id="new-session-btn" title="New session">＋</button>
+        </div>
+        <div class="sidebar-search">
+          <input id="search-input" type="search" placeholder="Search sessions…" autocomplete="off" />
+          <label class="search-messages-toggle">
+            <input type="checkbox" id="search-include-messages" />
+            <span>Also search messages</span>
+          </label>
+          <div id="search-results" class="search-results" style="display:none"></div>
+        </div>
+        <div id="session-filters" class="session-filters">
+          <select id="session-filter-select" class="session-filter-select" aria-label="Filter sessions">
+            <option value="all">All</option>
+            <option value="pinned">📌 Pinned</option>
+            <option value="running">⏳ Running</option>
+            <option value="recent" id="recent-filter-chip" title="Sessions with activity in the last N hours (Settings)">🕒 Recent</option>
+            <option value="unread">🔵 Unread</option>
+            <option value="archived">🗄️ Archived</option>
+          </select>
+        </div>
+        <div id="group-filters" class="group-filters"></div>
+        <div id="session-list" class="session-list"></div>
+        <div id="inbox-list" class="session-list inbox-list" style="display:none"></div>
+      </div>
+      <div id="sidebar-resize-handle" class="sidebar-resize-handle" title="Drag to resize"></div>
+    </aside>
+    <main class="main">
+      <div id="empty-state" class="empty-state">Select a session, or start a new one.</div>
+      <div id="group-overview" class="group-overview" style="display:none"></div>
+      <div id="inbox-view" class="inbox-view" style="display:none"></div>
+      <div id="thread-view" class="thread-view" style="display:none">
+        <div class="thread-header">
+          <div class="thread-header-top">
+            <span id="thread-title"></span>
+            <span id="thread-meta" class="thread-meta" title=""></span>
+          </div>
+          <div class="thread-header-toolbar">
+            <button id="session-info-btn" type="button" class="header-chip" title="Show session ID / working directory">ℹ️ Info</button>
+            <button id="note-btn" type="button" class="header-chip" title="Private note to self (never sent to the agent)">📝 Note</button>
+            <button id="slides-toggle-btn" type="button" class="header-chip" title="Show long replies as slides (one section at a time)">🎞 Slides</button>
+            <button id="bookmarks-btn" type="button" class="header-chip" title="Bookmarked messages in this thread">⭐ Bookmarks</button>
+            <button id="thread-watches-btn" type="button" class="header-chip" title="Watches for this thread">👁 Watches<span class="header-chip-count" id="thread-watches-count"></span><span class="header-chip-dot" id="thread-watches-dot"></span></button>
+            <span id="view-seg" class="view-seg" title="Watcher noise: Today = everything, Smart = routine watcher events folded, Messages only = just conversation"><button type="button" data-mode="raw">Today</button><button type="button" data-mode="smart">Smart</button><button type="button" data-mode="msgs">Messages only</button></span>
+            <span class="thread-header-toolbar-spacer"></span>
+            <span id="turn-elapsed" class="turn-elapsed" style="display:none"></span>
+            <button id="thread-overflow-btn" type="button" class="header-overflow-btn" title="More actions" aria-haspopup="true" aria-expanded="false">⋯</button>
+            <div id="thread-overflow-menu" class="thread-overflow-menu" style="display:none">
+              <button id="print-btn" type="button">🖨️ Print view</button>
+              <button id="continue-session-btn" type="button">↪ Continue in new session</button>
+              <button id="add-to-group-btn" type="button">🗂 Add to a group</button>
+            </div>
+          </div>
+          <div id="session-info-popover" class="session-info-popover" style="display:none">
+            <div class="session-info-row">
+              <span class="session-info-label">Session ID</span>
+              <code id="session-info-id">—</code>
+              <button type="button" class="session-info-copy-btn" data-copy-target="session-info-id" title="Copy session ID">📋</button>
+            </div>
+            <div class="session-info-row">
+              <span class="session-info-label">Working directory</span>
+              <code id="session-info-workdir">—</code>
+              <button type="button" class="session-info-copy-btn" data-copy-target="session-info-workdir" title="Copy working directory">📋</button>
+            </div>
+          </div>
+          <div id="note-popover" class="note-popover" style="display:none">
+            <div class="note-popover-label">Private note to self — never sent to the agent, visible only to you</div>
+            <textarea id="note-textarea" class="note-textarea" placeholder="Jot something down about this thread…"></textarea>
+            <div class="note-popover-status"><span id="note-save-status"></span></div>
+          </div>
+          <div id="bookmarks-popover" class="bookmarks-popover" style="display:none">
+            <div class="bookmarks-popover-label">Bookmarked messages</div>
+            <div id="bookmarks-list" class="bookmarks-list"></div>
+          </div>
+        </div>
+        <div id="group-banner" class="group-banner" style="display:none"></div>
+        <div id="messages" class="messages"></div>
+        <!-- Outside #messages so renderMessages()'s innerHTML='' wipe doesn't destroy it;
+             it is re-parented (not cloned) into the live "Working..." status bubble while a turn runs. -->
+        <button id="stop-turn-btn" type="button" class="stop-turn-btn" style="display:none" title="Stop the in-progress turn">⏹ Stop</button>
+        <div id="queued-badge" class="queued-badge" style="display:none">⏳ Interrupting current turn — your message is queued…</div>
+        <div class="compose-wrap">
+          <div id="mic-status" class="mic-status" style="display:none"></div>
+          <form id="compose-form" class="compose-form">
+            <textarea id="compose-text" placeholder="Message DOP Agent… (Enter to send, Shift+Enter for newline)" rows="2"></textarea>
+            <button id="mic-btn" type="button" class="mic-btn" title="Record a voice message">🎙️</button>
+            <button type="submit">Send</button>
+          </form>
+        </div>
+      </div>
+    </main>
+  </div>
+  <div id="watches-overlay" class="watches-overlay" style="display:none">
+    <div class="watches-panel watches-panel-wide">
+      <div class="watches-panel-header">
+        <h2 id="watches-panel-title">Watches</h2>
+        <label class="watches-include-inactive" id="watches-scope-toggle-wrap" style="display:none">
+          <input type="checkbox" id="watches-show-all-threads" /> Show all sessions
+        </label>
+        <label class="watches-include-inactive">
+          <input type="checkbox" id="watches-include-inactive" /> Show done/inactive
+        </label>
+        <button id="watches-close-btn" title="Close">✕</button>
+      </div>
+      <div class="watches-toolbar">
+        <input id="watches-search" type="search" class="watches-search" placeholder="Search label or key…" />
+        <label class="watches-broken-only-toggle">
+          <input type="checkbox" id="watches-broken-only" /> Broken only
+        </label>
+      </div>
+      <div id="watches-summary" class="watches-summary"></div>
+      <div id="watches-legend" class="watches-legend"></div>
+      <div id="watches-list" class="watches-list"></div>
+    </div>
+  </div>
+  </div>
+  <div id="shortcuts-overlay" class="watches-overlay" style="display:none">
+    <div class="watches-panel shortcuts-panel">
+      <div class="watches-panel-header">
+        <h2>Keyboard shortcuts</h2>
+        <button id="shortcuts-close-btn" title="Close">✕</button>
+      </div>
+      <div class="shortcuts-list">
+        <div class="shortcut-row"><kbd>j</kbd><span>Next session</span></div>
+        <div class="shortcut-row"><kbd>k</kbd><span>Previous session</span></div>
+        <div class="shortcut-row"><kbd>/</kbd><span>Focus search</span></div>
+        <div class="shortcut-row"><kbd>1</kbd> <kbd>2</kbd> <kbd>3</kbd><span>Ideas widget (focused on arrival, or hover): ok / nok / skip; Esc returns to the compose box</span></div>
+        <div class="shortcut-row"><kbd>Enter</kbd><span>Send message</span></div>
+        <div class="shortcut-row"><kbd>Cmd/Ctrl</kbd> + <kbd>Enter</kbd><span>Send message (even after Shift+Enter newlines)</span></div>
+        <div class="shortcut-row"><kbd>Shift</kbd> + <kbd>Enter</kbd><span>Newline in compose box</span></div>
+        <div class="shortcut-row"><kbd>?</kbd><span>Show this cheat sheet</span></div>
+        <div class="shortcut-row"><kbd>Esc</kbd><span>Close this cheat sheet</span></div>
+      </div>
+    </div>
+  </div>
+  <div id="settings-overlay" class="watches-overlay" style="display:none">
+    <div class="watches-panel settings-panel" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <div class="watches-panel-header">
+        <h2 id="settings-title">Settings</h2>
+        <button id="settings-close-btn" title="Close" aria-label="Close settings">✕</button>
+      </div>
+      <div class="sx-search">
+        <input type="search" id="settings-search" placeholder="Search settings… (press / to focus)" aria-label="Search settings" autocomplete="off" spellcheck="false" />
+      </div>
+      <div id="settings-tabs" class="sx-tabs" role="tablist">
+        <button type="button" role="tab" data-stab="integrations" class="sx-tab active" aria-selected="true">Integrations</button>
+        <button type="button" role="tab" data-stab="browser" class="sx-tab" aria-selected="false">Browser</button>
+        <button type="button" role="tab" data-stab="agent" class="sx-tab" aria-selected="false">Agent</button>
+        <button type="button" role="tab" data-stab="transcription" class="sx-tab" aria-selected="false">Transcription</button>
+        <button type="button" role="tab" data-stab="adapters" class="sx-tab" aria-selected="false">Adapters</button>
+        <button type="button" role="tab" data-stab="mcp" class="sx-tab" aria-selected="false">MCP</button>
+        <button type="button" role="tab" data-stab="watchers" class="sx-tab" aria-selected="false">Watchers</button>
+        <button type="button" role="tab" data-stab="unfurl" class="sx-tab" aria-selected="false">Unfurl</button>
+        <button type="button" role="tab" data-stab="advanced" class="sx-tab" aria-selected="false">Advanced</button>
+      </div>
+      <div class="sx-body">
+      <div id="settings-pane-browser" class="sx-pane" role="tabpanel" hidden>
+      <div class="settings-section">
+        <div class="settings-section-title">Appearance</div>
+        <label class="settings-row">
+          Theme:
+          <select id="settings-theme" data-theme-select>
+            <option value="dark">Dark</option>
+            <option value="light">Light</option>
+            <option value="system">System (follow OS)</option>
+          </select>
+        </label>
+        <div class="settings-hint">Stored in this browser only; also switchable from the health strip. "System" follows your OS light/dark setting live.</div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title">Notifications</div>
+        <label class="settings-row">
+          <input type="checkbox" id="settings-quiet-hours-enabled" />
+          Quiet hours — suppress "turn finished" notifications during a
+          configured time window
+        </label>
+        <div class="settings-row settings-quiet-hours-times">
+          <label>From <input type="time" id="settings-quiet-hours-start" value="22:00" /></label>
+          <label>To <input type="time" id="settings-quiet-hours-end" value="08:00" /></label>
+        </div>
+        <div class="settings-hint">Times are in your browser's local timezone. A range that wraps midnight (e.g. 22:00 → 08:00) is supported.</div>
+      </div>
+      <div class="settings-section">
+        <div class="settings-section-title">Sessions list</div>
+        <label class="settings-row">
+          "Recent" filter window:
+          <input type="number" id="settings-recent-hours" min="1" max="720" step="1" value="8" style="width:64px" /> hours
+        </label>
+        <div class="settings-hint">The 🕒 Recent filter shows sessions that had activity (a turn or message) within this many hours.</div>
+      </div>
+      </div>
+      <div id="settings-pane-general" class="sx-pane" role="tabpanel" hidden></div>
+      <div id="settings-pane-integrations" class="sx-pane" role="tabpanel"></div>
+      <div id="settings-pane-advanced" class="sx-pane" role="tabpanel" hidden></div>
+      </div>
+    </div>
+  </div>
+  <script src="/static/furls.js"></script>
+  <script src="/static/app.js"></script>
+  <script src="/static/ideas.js"></script>
+  <script src="/static/ask.js"></script>
+  <script src="/static/actions.js"></script>
+  <script src="/static/inbox.js"></script>
+  <script src="/static/mermaid.js"></script>
+  <script src="/static/chart.js"></script>
+  <script src="/static/groups.js"></script>
+  <script src="/static/usage.js"></script>
+  <script src="/static/settings.js"></script>
+</body>
+</html>

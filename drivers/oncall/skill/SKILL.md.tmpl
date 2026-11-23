@@ -1,0 +1,52 @@
+---
+name: ${{skill.name}}
+description: "Use when: ANY PagerDuty/Opsgenie read or action on ${{config.base_url}} (${{config.title}}) — incidents/alerts, on-call, schedules, escalations, and watchers."
+---
+
+# ${{skill.name}} — alerting & on-call at ${{config.base_url}} (${{config.title}}), backend `${{config.backend}}`
+
+Integration instance: `${{instance.name}}`. Always run the CLI with `--instance` (it resolves base URL, backend and API key from config; never print or echo the key):
+
+`${{driver.python}} ${{driver.cli}} --instance ${{instance.name}} <command>`
+
+The same commands work for both backends (PagerDuty `incident` = Opsgenie `alert`); this instance's backend is `${{config.backend}}`.
+
+**Not the `jsm` skill.** `jsm-*` covers Opsgenie that lives *inside* a Jira Service Management site (Atlassian token, JSM Ops API, `alerts`/`oncall` there). This skill is for standalone PagerDuty or standalone Opsgenie (`api.opsgenie.com`) with a plain API key. If the user's Opsgenie is part of Jira/JSM, use the `jsm` skill instead.
+
+## Commands (read)
+| Need | Command |
+|---|---|
+| Open incidents/alerts (one line each) | `incidents [--status open\|all] [--service ID] [--team X] [--query Q] [--since-hours N] [--limit 30]` |
+| One incident/alert + last notes | `incident ID [--notes 3]` |
+| Timeline (log entries) | `timeline ID [--limit 30]` |
+| Who is on call now / next | `oncall [--schedule ID\|--name TEXT] [--next] [--date ISO] [--limit 30]` (no schedule = up to 20 schedules) |
+| Schedules | `schedules [--query TEXT]` |
+| Escalation policies | `escalations [--query TEXT]`; `escalation ID` (levels, delays, targets) |
+| Services / teams | `services [--query TEXT]` (PagerDuty; on Opsgenie it lists teams); `teams` |
+| Anything else (GET) | `raw GET /path [-q k=v] [--jq a.b[*].c] [--max 4000]` |
+| Check the connection | `test` |
+
+Filters: PagerDuty `--service`/`--team` take ids (find them with `services`/`teams`). Opsgenie: `--team` is a team name, `--query` uses the Opsgenie search syntax (e.g. `priority: P1`), `--service` is unsupported. ID may be the Opsgenie tiny id (digits). On-call times are shown for PagerDuty only; Opsgenie returns names.
+
+## Writes — confirm-first
+`ack ID`, `resolve ID` (Opsgenie: close), `note ID "text"`, `override SCHEDULE --user X --start ISO --end ISO` (PagerDuty `--user` = user id, Opsgenie = username; ISO with offset, naive = UTC), non-GET `raw`.
+- **Without `--confirm` the CLI only prints a PREVIEW and sends nothing.** Run the preview, show the user the incident/alert id + title (use `incident ID`), the exact text/times, and run again with `--confirm` only after the user explicitly agreed. Never add `--confirm` on the first call.
+- Only when the user explicitly asked. Resolving/closing and overrides change who gets paged: state the schedule, person and window explicitly.
+- PagerDuty writes need `from_email` on the instance; if a write fails with that message, tell the user to set the option.
+
+## Rules
+- **Don't explore**: every command and watcher flag is documented here; never run `--help`, `ls`/`find` for scripts, or read watcher source. Watcher scripts only run through `watch_script` (they live in `${{driver.watch_dir}}`).
+- Report incidents with their link when the output has a `url:` line (Opsgenie links need the `subdomain` option).
+- Duty reports: `oncall` for now/next; triage: `incidents` then `timeline`/`incident --notes`.
+- Bound scans: `--limit`, `--service`/`--team`, `--since-hours`; save big outputs to `/tmp` and summarize.
+
+## Watchers (wake the session on change; do not poll yourself)
+Use `watch_script` with `script="oncall_watch.py"`, `integration="${{instance.name}}"` (injects this account) and `watcher=<id>` (picks the icon). Read-only: exit 0 silent / 200 changed / other = error; the first run is a silent baseline. Schedule e.g. `cron:*/5 * * * *`, `retries=3`. The leading args of the chosen watcher are added automatically; pass only the extra flags.
+
+| watcher id | Fires on | Extra flags |
+|---|---|---|
+| `oncall-incidents` 🚨 | new open (triggered/acknowledged) incidents/alerts, each once | `--service ID`, `--team X`, `--query Q`, `--limit 50`, `--report-initial`, `--report-resolved` |
+| `oncall-oncall` 📟 | the on-call people of a schedule changed | `--schedule ID` or `--name TEXT` (none = up to 20 schedules) |
+
+Example: `watch_script(session_id=<id>, script="oncall_watch.py", watcher="oncall-incidents", integration="${{instance.name}}", args=["--team", "<team>"], schedule="cron:*/5 * * * *", prompt="triage new incidents", retries=3)`.
+To validate a watch use `watch_script(..., dry_run=true)` and report clearly whether it was only a dry run or really registered.

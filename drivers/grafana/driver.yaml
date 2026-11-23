@@ -1,0 +1,53 @@
+# Package driver: Grafana (dashboards, folders, alerts, data sources) over the REST API. CLI + watcher scripts +
+# skill template; no polling in the bot. Generic: no host is built in; every instance sets its own base_url + auth
+# (config.yaml -> integrations.<name>), several instances = several Grafana servers, each with its own skill.
+# The CLI/watcher scripts resolve the instance (base_url, token ref, options) from config.yaml via --instance, so
+# tokens never travel through argv/env/skills. Off unless an instance is configured.
+id: grafana
+title: Grafana
+type: package
+icon: icon.svg
+auth:
+  types:
+    service_account_token:
+      title: Service account token (Bearer; Viewer for reads, Editor to change dashboards)
+      fields:
+        token: { secret: true, required: true }
+    oauth_cdp:
+      title: OAuth proxy in front of Grafana (token minted via a signed-in CDP browser; set idp_url)
+      fields: {}
+settings:
+  base_url: { required: true, example: "https://grafana.example.com" }
+options:
+  idp_url: { type: string, default: "", pattern: '(?i)(https://[a-z0-9._\-]+(:[0-9]{1,5})?/?)?',
+             help: "oauth_cdp only: base URL of the OAuth authorization server (must serve /.well-known/oauth-authorization-server)" }
+  cdp_url: { type: string, default: "http://localhost:9222", pattern: '(?i)(https?://[a-z0-9._\-]+(:[0-9]{1,5})?/?)?',
+             help: "oauth_cdp only: browser remote-debugging endpoint of a profile signed in to the SSO (used by `auth authorize`)" }
+  org_id:  { type: string, default: "", pattern: '[0-9]{0,9}', help: "Grafana organization id to act in (default: the identity's current org)" }
+  title:   { type: string, pattern: '[^"`$\\<>]{0,80}', help: "Short label for lists and the skill description (default: the instance name)" }
+cli:
+  entry: cli/cli.py
+  global_args: ["--instance", "${{instance.name}}"]
+env:
+  GRAFANA_INSTANCE: "${{instance.name}}"
+skill:
+  template: skill/SKILL.md.tmpl
+  name: grafana
+watchers:
+  grafana-alerts-firing:  { script: grafana_watch.py, args: [alerts], emoji: "🔥", slack_emoji: ":fire:", title: New firing alert instance }
+  grafana-dashboard-changed: { script: grafana_watch.py, args: [dashboard-changed], emoji: "📊", slack_emoji: ":bar_chart:", title: Dashboard saved by someone (new version) }
+  grafana-datasource-health: { script: grafana_watch.py, args: [datasource-health], emoji: "🩺", slack_emoji: ":stethoscope:", title: Data source turned unhealthy }
+kinds:
+  dashboard:
+    url_match: '^{base_url}/d(?:-solo)?/(?P<uid>[A-Za-z0-9_\-]+)(?:/[^/?#]*)?(?:\?[^#]*)?(?:#.*)?$'
+    url_template: '{base_url}/d/{uid}'
+    card: { fields: [folder, tags, updated, version], icon: icon.svg, label: 'Grafana dashboard' }
+  folder:
+    url_match: '^{base_url}/dashboards/f/(?P<uid>[A-Za-z0-9_\-]+)(?:/[^/?#]*)?(?:\?[^#]*)?$'
+    url_template: '{base_url}/dashboards/f/{uid}'
+    card: { fields: [parents, updated], icon: icon.svg, label: 'Grafana folder' }
+  alert:
+    url_match: '^{base_url}/alerting/grafana/(?P<uid>[A-Za-z0-9_\-]+)/view(?:\?[^#]*)?$'
+    url_template: '{base_url}/alerting/grafana/{uid}/view'
+    card: { fields: [folder, group, for, updated], icon: icon.svg, label: 'Grafana alert rule' }
+version: 1

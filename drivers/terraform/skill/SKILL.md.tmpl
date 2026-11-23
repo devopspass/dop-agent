@@ -1,0 +1,48 @@
+---
+name: ${{skill.name}}
+description: "Use when: ANY Terraform (HCP Terraform / Enterprise) read/action on ${{config.base_url}} (`${{config.title}}`) — workspaces, runs and plans, state outputs, drift, policy checks, and watchers."
+---
+
+# ${{skill.name}} — Terraform `${{config.title}}`
+
+Integration instance: `${{instance.name}}`, organization `${{config.organization}}`, host `${{config.base_url}}`.
+Run the CLI as (global option before the command):
+
+`${{driver.python}} ${{driver.cli}} --instance ${{instance.name}} <command>`
+
+Tokens are never printed; never echo or ask for them (the instance's `auth.token` ref is resolved by the CLI).
+Context: cloud landing zones are managed through Terragrunt/Terraform; workspaces are the units of change.
+
+## Commands
+| Need | Command |
+|---|---|
+| Check connection (config, auth, organization) | `test` (JSON) |
+| Workspaces with last-run status / lock | `workspaces [--search S] [--tag T] [--limit 50]` |
+| Recent runs + plan summary (`+add ~change -destroy`) | `runs --workspace W [--limit 10] [--status errored]` |
+| One run: status, actions, plan, policy | `run RUN_ID` |
+| Policy checks of a run | `policy RUN_ID` |
+| State version + output names/types | `state --workspace W [--values]` (values only for non-sensitive outputs) |
+| Variable names (values never shown) | `vars --workspace W` |
+| Drift (health assessment) | `drift [--workspace W] [--limit 50]` |
+| Start a run (dry run without `--yes`) | `trigger --workspace W [--message M] [--plan-only] [--yes]` |
+| Approve / discard / cancel (dry run without `--yes`) | `apply RUN_ID`, `discard RUN_ID`, `cancel RUN_ID` + `[--comment C] [--yes]` |
+
+Listings accept `--json`. Run ids look like `run-xxxxxxxx`; workspace names are plain names from `workspaces`.
+
+## Rules
+- **Don't explore, everything is documented here.** Never run `--help`, `ls`/`find` for scripts, or read watcher source: watcher scripts live in `${{driver.watch_dir}}` and are only run through `watch_script`. To validate a watch use `watch_script(..., dry_run=true)` and report clearly whether it was only a dry run or really registered.
+- Everything except `trigger`/`apply`/`discard`/`cancel` is read-only. Those writes are real actions on infrastructure: run WITHOUT `--yes` first, show the user the dry-run output (workspace, run, plan summary, message), and add `--yes` only after explicit approval. `apply` is refused unless the run is waiting for confirmation; for destroys (`-N` in the plan summary or `destroy=True`) call it out and re-confirm.
+- Never print variable values or sensitive outputs; do not guess secrets. Check the plan summary and policy results before recommending `apply`.
+- Bound scans: use `--search/--tag/--workspace/--limit`; summarize big outputs.
+
+## Watchers (wake the session on change; do not poll Terraform yourself)
+Use `watch_script` with `script="terraform_watch.py"`, `integration="${{instance.name}}"` and `watcher=<id>`. Read-only: exit 0 silent / 200 changed / other = error; the first run is a silent baseline. Schedule e.g. `cron:*/10 * * * *`, `retries=3`.
+
+| watcher id | Fires on | Leading arg | Extra flags |
+|---|---|---|---|
+| `terraform-run-finished` 🏗️ | a workspace's current run reached a final state | `runs` | `--search S`, `--tag T`, `--status errored,applied`, `--only-failed`, `--max-pages 3` |
+| `terraform-needs-approval` ✋ | a run waits for confirmation / policy override | `approval` | `--search`, `--tag`, `--max-pages` |
+| `terraform-drift` 🌊 | drift newly detected or drifted-resource count changed | `drift` | `--search`, `--tag`, `--max-workspaces 50`, `--max-pages` |
+
+The leading mode is added automatically; pass only extra flags in `args`.
+Example: `watch_script(session_id=<id>, script="terraform_watch.py", watcher="terraform-needs-approval", integration="${{instance.name}}", args=["--search","prod"], schedule="cron:*/10 * * * *", prompt="a Terraform run needs approval: show plan summary and policy checks, recommend, do not apply without approval", retries=3)`.

@@ -1,0 +1,50 @@
+# Package driver: Kargo (continuous promotion for GitOps): projects, warehouses, freight, stages, promotions,
+# verification. CLI (wraps the `kargo` binary) + watcher scripts + skill template; no polling in the bot.
+# Generic: no host is built in; every instance sets its own base_url + token (config.yaml -> integrations.<name>),
+# several instances = several Kargo servers, each with its own skill. The CLI/watcher scripts resolve the instance
+# from config.yaml via --instance; the token reaches the `kargo` subprocess only through its environment
+# (KARGO_API_TOKEN), never argv/skills/logs. Off unless an instance is configured.
+id: kargo
+title: Kargo
+type: package
+icon: icon.svg
+auth:
+  types:
+    bearer_token:
+      title: Kargo API token (service-account token or admin/SSO token; read-only role is enough for reads)
+      fields:
+        token: { secret: true, required: true }
+settings:
+  base_url: { required: true, example: "https://kargo.example.com" }
+options:
+  default_project: { type: string, default: "", pattern: '([a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?)?',
+                     help: "Kargo project used when --project is not given (empty = always pass --project)" }
+  insecure_skip_tls_verify: { type: bool, default: false, help: "Skip TLS certificate verification (self-signed server)" }
+  title: { type: string, pattern: '[^"`$\\<>]{0,80}', help: "Short label for lists and the skill description (default: the instance name)" }
+cli:
+  entry: cli/cli.py
+  global_args: ["--instance", "${{instance.name}}"]
+env:
+  KARGO_INSTANCE: "${{instance.name}}"
+skill:
+  template: skill/SKILL.md.tmpl
+  name: kargo
+watchers:
+  kargo-new-freight:     { script: kargo_watch.py, args: [new-freight], emoji: "📦", slack_emoji: ":package:", title: New freight in a warehouse }
+  kargo-promotion-result: { script: kargo_watch.py, args: [promotion-result], emoji: "🚀", slack_emoji: ":rocket:", title: Promotion succeeded or failed }
+  kargo-stage-health:    { script: kargo_watch.py, args: [stage-health], emoji: "🩺", slack_emoji: ":stethoscope:", title: Stage health changed }
+  kargo-verification-failed: { script: kargo_watch.py, args: [verification-failed], emoji: "🧪", slack_emoji: ":test_tube:", title: Stage verification failed }
+kinds:
+  stage:
+    url_match: '^{base_url}/project/(?P<project>[a-z0-9][-a-z0-9]*)/stage/(?P<stage>[a-z0-9][-a-z0-9.]*)/?(?:\?[^#]*)?(?:#.*)?$'
+    url_template: '{base_url}/project/{project}/stage/{stage}'
+    card: { fields: [project, phase, health, freight, last_promotion], icon: icon.svg, label: 'Stage {stage}' }
+  freight:
+    url_match: '^{base_url}/project/(?P<project>[a-z0-9][-a-z0-9]*)/freight/(?P<freight>[A-Za-z0-9][-A-Za-z0-9.]*)/?(?:\?[^#]*)?(?:#.*)?$'
+    url_template: '{base_url}/project/{project}/freight/{freight}'
+    card: { fields: [project, warehouse, artifacts, verified_in, approved_for, created], icon: icon.svg, label: 'Freight {freight}' }
+  promotion:
+    url_match: '^{base_url}/project/(?P<project>[a-z0-9][-a-z0-9]*)/promotion/(?P<promotion>[A-Za-z0-9][-A-Za-z0-9.]*)/?(?:\?[^#]*)?(?:#.*)?$'
+    url_template: '{base_url}/project/{project}/promotion/{promotion}'
+    card: { fields: [project, stage, phase, freight, finished], icon: icon.svg, label: 'Promotion' }
+version: 1

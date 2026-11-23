@@ -1,0 +1,61 @@
+# Package driver: Wiz (cloud security). CLI + watcher script + skill template; no polling by the bot.
+# Reads findings through the GraphQL API with the OAuth token that `wizcli` keeps in <wiz_dir>/auth.json (or the service-account credentials). On-demand rescans additionally need a logged-in app.wiz.io tab in a CDP-enabled browser.
+# Credentials (auth type service_account) stay in config.yaml as ${env:}/${file:}/${keychain:} refs; the CLI/watcher resolve
+# them by instance name (wiz_config.py, like the gitlab driver) and hand them only to the wizcli subprocess.
+# Per-instance values (config.yaml -> integrations.<name>.options) are injected into the skill, CLI args and watcher env
+# through ${{config.<option>}}. Off by default. One instance per Wiz tenant: give each its own wiz_dir.
+id: wiz
+title: Wiz
+type: package
+icon: icon.svg
+auth:
+  types:
+    wizcli: { title: "wizcli login in the instance's wiz_dir (no secret stored here)", fields: {} }
+    service_account:
+      title: Wiz service account (client id + secret; refs like ${env:WIZ_CLIENT_SECRET})
+      fields:
+        client_id:     { secret: true, required: true }
+        client_secret: { secret: true, required: true }
+options:
+  wiz_dir:      { type: string, default: "~/.wiz", required: true, pattern: '[A-Za-z0-9._/~\-]{1,200}',
+                  help: "Directory with the wizcli auth.json of this tenant (wizcli honours WIZ_DIR); one directory per Wiz tenant" }
+  data_center:  { type: string, default: "auto", required: true, pattern: 'auto|[a-z0-9]{2,12}',
+                  help: "Wiz data center (e.g. eu1, us2); 'auto' = the one recorded in auth.json" }
+  scope_tags:   { type: string, default: "none", required: true,
+                  pattern: 'none|[A-Za-z0-9_.:/\-]+=[A-Za-z0-9_.:/\-]+(,[A-Za-z0-9_.:/\-]+=[A-Za-z0-9_.:/\-]+)*',
+                  help: "Asset tags (key=value,key=value) every findings query is limited to, e.g. application=billing; 'none' = whole tenant" }
+  env_tag_key:  { type: string, default: "environment", required: true, pattern: '[A-Za-z0-9_.:/\-]{1,64}',
+                  help: "Asset tag key that the --env filter of the CLI/watchers matches against" }
+  cdp_url:      { type: string, default: "http://localhost:9222", required: true, pattern: '(?i)https?://[a-z0-9._\-]+(:[0-9]{1,5})?/?',
+                  help: "Browser remote-debugging endpoint with a logged-in app.wiz.io tab (only for rescan commands)" }
+  title:        { type: string, pattern: '[^"`$\\<>]{0,80}', help: "Short label for lists and the skill description (default: the instance name)" }
+cli:
+  entry: cli/cli.py
+  global_args: ["--instance", "${{instance.name}}", "--wiz-dir", "${{config.wiz_dir}}", "--data-center", "${{config.data_center}}",
+                "--scope-tags", "${{config.scope_tags}}", "--env-tag-key", "${{config.env_tag_key}}",
+                "--cdp-url", "${{config.cdp_url}}"]
+env:
+  WIZ_INSTANCE: "${{instance.name}}"
+  WIZ_DIR: "${{config.wiz_dir}}"
+  WIZ_DATA_CENTER: "${{config.data_center}}"
+  WIZ_SCOPE_TAGS: "${{config.scope_tags}}"
+  WIZ_ENV_TAG_KEY: "${{config.env_tag_key}}"
+  WIZ_CDP_URL: "${{config.cdp_url}}"
+skill:
+  template: skill/SKILL.md.tmpl
+  name: wiz
+watchers:
+  wiz-new-findings: { script: wiz_watch.py, args: [findings], emoji: "🛡️", slack_emoji: ":shield:", title: New open vulnerability findings }
+  wiz-counts:       { script: wiz_watch.py, args: [counts], emoji: "📊", slack_emoji: ":bar_chart:", title: Open-finding counts changed }
+  wiz-rescan-done:  { script: wiz_watch.py, args: [rescan-done], emoji: "🔄", slack_emoji: ":arrows_counterclockwise:", title: Rescan finished }
+# Wiz portal deep links are hash-routed (app.wiz.io/issues#~(...)); dop-agent ignores URL fragments, so only
+# path-style links are matched. Several instances share the same host, so with more than one enabled instance a link is
+# left plain (Wiz links carry no tenant id).
+kinds:
+  issue:
+    url_match: '^https://app\.(?:[a-z0-9-]+\.)?wiz\.(?:io|us)/issues/(?P<id>[0-9a-fA-F-]{36})/?$'
+    card: { fields: [severity, asset, created], icon: icon.svg, label: 'Wiz issue' }
+  finding:
+    url_match: '^https://app\.(?:[a-z0-9-]+\.)?wiz\.(?:io|us)/findings/vulnerabilities/(?P<id>[0-9a-fA-F-]{36})/?$'
+    card: { fields: [severity, asset, fixed], icon: icon.svg, label: 'Wiz finding' }
+version: 1

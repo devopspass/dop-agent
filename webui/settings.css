@@ -1,0 +1,111 @@
+/* Settings overlay tabs (General / Integrations / Advanced). Tokens come from style.css :root. */
+.settings-panel { width: 920px; max-width: 96vw; height: 80vh; max-height: 80vh; position: relative; }
+.sx-tabs { display: flex; overflow-x: auto; gap: 2px; padding: 0 12px; border-bottom: 1px solid var(--slack-border); }
+.sx-tab { background: none; border: 0; border-bottom: 2px solid transparent; color: var(--slack-text-secondary); padding: 9px 14px; cursor: pointer; font: inherit; font-size: 13px; }
+.sx-tab:hover { color: var(--ct-fff,#fff); }
+.sx-tab.active { color: var(--ct-fff,#fff); border-bottom-color: var(--slack-accent); }
+.sx-tab:focus-visible, .sx-btn:focus-visible, .sx-link:focus-visible { outline: 2px solid var(--slack-link); outline-offset: 1px; }
+.sx-body { flex: 1; overflow: auto; position: relative; }
+.sx-pane { padding: 12px 16px 0; }
+.sx-pane[hidden] { display: none; }
+#settings-pane-browser { padding: 0; }
+.sx-sub { color: var(--slack-text-secondary); font-size: 12px; margin-bottom: 10px; }
+.sx-grow { flex: 1; }
+.sx-card { background: var(--slack-bubble-assistant-bg); border: 1px solid var(--slack-border); border-radius: 8px; margin-bottom: 14px; overflow: hidden; }
+.sx-hd { margin: 0; padding: 9px 16px; border-bottom: 1px solid var(--slack-border); font-size: 13px; color: var(--ct-fff,#fff); text-transform: capitalize; display: flex; align-items: center; gap: 10px; }
+.sx-pad { padding: 12px 16px; }
+.sx-row { display: grid; grid-template-columns: 250px 1fr; gap: 12px; padding: 10px 16px; border-bottom: 1px solid rgba(var(--ov,255,255,255),.06); align-items: start; }
+.sx-row:last-child { border-bottom: 0; }
+.sx-row.sx-dirty { box-shadow: inset 3px 0 0 var(--slack-accent); }
+.sx-row.sx-invalid { box-shadow: inset 3px 0 0 #e01e5a; }
+.sx-lbl label { font-size: 13px; color: var(--slack-text-primary); text-transform: capitalize; }
+.sx-env { display: block; font: 11px monospace; color: #7a7c80; margin: 2px 0; word-break: break-all; }
+.sx-badges { display: flex; gap: 4px; flex-wrap: wrap; }
+.sx-badge { font-size: 10px; padding: 1px 7px; border-radius: 9px; background: var(--slack-bubble-user-bg); color: var(--slack-text-secondary); white-space: nowrap; }
+.sx-b-restart { background: rgba(236,178,46,.2); color: var(--ct-ecb22e,#ecb22e); }
+.sx-b-hot { background: rgba(46,182,125,.2); color: #2eb67d; }
+.sx-b-ovr { background: rgba(29,155,209,.2); color: var(--slack-link); }
+.sx-b-file { background: rgba(17,100,163,.35); color: var(--ct-9cd0f2,#9cd0f2); }
+.sx-b-bad { background: rgba(224,30,90,.3); color: var(--ct-ff9b9b,#ff9b9b); }
+.sx-pane input[type=text], .sx-pane input[type=number], .sx-pane input[type=password], .sx-pane select,
+.sx-modal input[type=text], .sx-modal input[type=number], .sx-modal input[type=password], .sx-modal select {
+  background: var(--slack-main-bg); border: 1px solid var(--slack-border); color: var(--slack-text-primary); border-radius: 4px; padding: 6px 8px; font: inherit; font-size: 13px; width: 100%; max-width: 420px;
+}
+.sx-pane input:focus, .sx-pane select:focus, .sx-modal input:focus, .sx-modal select:focus { outline: 1px solid var(--slack-accent); }
+.sx-pane input:disabled, .sx-pane select:disabled { opacity: .55; }
+.sx-hint { font-size: 11px; color: var(--slack-text-secondary); margin-top: 4px; }
+.sx-warn-t { color: var(--ct-ecb22e,#ecb22e); }
+.sx-errmsg { color: var(--ct-ff9b9b,#ff9b9b); font-size: 11px; margin-top: 4px; }
+.sx-errmsg:empty { display: none; }
+.sx-link { background: none; border: 0; color: var(--slack-link); cursor: pointer; padding: 0; font: inherit; font-size: 11px; text-decoration: underline; }
+.sx-btn { background: var(--slack-bubble-user-bg); border: 1px solid var(--slack-border); color: var(--ct-eee,#eee); border-radius: 5px; padding: 6px 12px; cursor: pointer; font: inherit; font-size: 13px; }
+.sx-btn:hover:not(:disabled) { background: var(--cb-35373b,#35373b); }
+.sx-btn:disabled { opacity: .5; cursor: not-allowed; }
+.sx-primary { background: var(--slack-accent); border-color: var(--slack-accent); color: #fff; }
+.sx-primary:hover:not(:disabled) { background: #0d5185; }
+.sx-danger { color: var(--ct-ff9b9b,#ff9b9b); }
+.sx-savebar { position: sticky; bottom: 0; margin: 0 -16px; padding: 10px 16px; background: var(--cb-0f1113,#0f1113); border-top: 1px solid var(--slack-border); display: flex; gap: 10px; align-items: center; font-size: 12px; color: var(--slack-text-secondary); }
+.sx-banner { padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; font-size: 12px; }
+.sx-warn { background: rgba(236,178,46,.12); border: 1px solid rgba(236,178,46,.4); color: var(--ct-ecb22e,#ecb22e); }
+.sx-ok { background: rgba(46,182,125,.12); border: 1px solid rgba(46,182,125,.4); color: #2eb67d; }
+.sx-bad { background: rgba(224,30,90,.12); border: 1px solid rgba(224,30,90,.4); color: var(--ct-ff9b9b,#ff9b9b); }
+.sx-empty { padding: 28px 16px; text-align: center; color: var(--slack-text-secondary); font-size: 13px; }
+.sx-empty.sx-err { color: var(--ct-ff9b9b,#ff9b9b); }
+.sx-toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+.sx-irow { display: flex; gap: 12px; align-items: center; padding: 12px 16px; border-bottom: 1px solid rgba(var(--ov,255,255,255),.06); flex-wrap: wrap; }
+.sx-irow:last-child { border-bottom: 0; }
+.sx-nm { font-weight: 600; color: var(--ct-fff,#fff); }
+.sx-meta { font-size: 11px; color: var(--slack-text-secondary); font-weight: 400; }
+.sx-ico { width: 32px; height: 32px; border-radius: 6px; background: var(--slack-bubble-user-bg); display: inline-flex; align-items: center; justify-content: center; font-weight: 700; color: var(--ct-fff,#fff); flex: none; }
+.sx-status { font-size: 12px; color: var(--slack-text-secondary); display: inline-flex; align-items: center; gap: 4px; }
+.sx-dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; background: var(--cb-666,#666); }
+.sx-d-ok { background: #2eb67d; } .sx-d-bad { background: #e01e5a; } .sx-d-off { background: var(--cb-666,#666); } .sx-d-warn { background: #ecb22e; }
+.sx-switch { appearance: none; -webkit-appearance: none; width: 34px; height: 18px; border-radius: 9px; background: var(--cb-555,#555); position: relative; cursor: pointer; border: 0; flex: none; }
+.sx-switch::after { content: ""; position: absolute; left: 2px; top: 2px; width: 14px; height: 14px; border-radius: 50%; background: #fff; transition: left .12s; }
+.sx-switch:checked { background: #2eb67d; } .sx-switch:checked::after { left: 18px; }
+.sx-switch:focus-visible { outline: 2px solid var(--slack-link); outline-offset: 2px; }
+.sx-secret-row { display: flex; gap: 6px; flex-wrap: wrap; align-items: flex-start; }
+.sx-secret-row > select { width: auto; min-width: 150px; }
+.sx-secret-inputs { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 200px; }
+.sx-secret-inputs[hidden], .sx-secret-inputs > [hidden] { display: none; }
+.sx-modal-bg { position: absolute; inset: 0; background: rgba(0,0,0,.55); display: flex; align-items: center; justify-content: center; z-index: 5; }
+.settings-panel .sx-modal-bg { position: fixed; z-index: 120; }
+.sx-modal { background: var(--slack-main-bg); border: 1px solid var(--slack-border); border-radius: 8px; width: 640px; max-width: 94vw; max-height: 88vh; display: flex; flex-direction: column; }
+.sx-modal-hd { display: flex; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--slack-border); }
+.sx-modal-hd h3 { margin: 0; flex: 1; font-size: 15px; color: var(--ct-fff,#fff); }
+.sx-x { background: none; border: 0; color: var(--ct-ccc,#ccc); cursor: pointer; font-size: 16px; }
+.sx-modal-body { padding: 14px 16px; overflow: auto; }
+.sx-modal-ft { padding: 10px 16px; border-top: 1px solid var(--slack-border); display: flex; gap: 8px; justify-content: flex-end; flex-wrap: wrap; }
+.sx-steps { display: flex; gap: 6px; list-style: none; padding: 0; margin: 0 0 14px; }
+.sx-steps li { flex: 1; padding: 5px 8px; border-radius: 5px; background: var(--slack-bubble-assistant-bg); font-size: 12px; color: var(--slack-text-secondary); border-bottom: 2px solid var(--slack-border); }
+.sx-steps .on { color: var(--ct-fff,#fff); border-color: var(--slack-accent); } .sx-steps .done { color: #2eb67d; border-color: #2eb67d; }
+.sx-drv-search { width: 100%; box-sizing: border-box; margin: 0 0 10px; padding: 7px 10px; }
+.sx-drivers { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 10px; }
+.sx-drv { text-align: left; border: 1px solid var(--slack-border); border-radius: 8px; padding: 12px; color: var(--slack-text-primary); background: var(--slack-bubble-assistant-bg); cursor: pointer; font: inherit; display: flex; flex-direction: column; gap: 6px; }
+.sx-drv:hover, .sx-drv.sel, .sx-drv:focus-visible { border-color: var(--slack-accent); outline: none; }
+.sx-drv small { color: var(--slack-text-secondary); font-size: 11px; }
+.sx-wrow { display: grid; grid-template-columns: 140px 1fr; gap: 10px; padding: 7px 0; align-items: start; }
+.sx-wrow > label { font-size: 13px; text-transform: capitalize; padding-top: 6px; }
+.sx-kind { display: flex; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(var(--ov,255,255,255),.06); flex-wrap: wrap; font-size: 13px; }
+.sx-kind input[type=number] { width: 80px; }
+.sx-test { padding: 10px 0; font-size: 13px; color: var(--slack-text-secondary); }
+.sx-yaml { margin: 0; padding: 12px 16px; font: 12px/1.5 ui-monospace, Menlo, monospace; color: var(--ct-cfd,#cfd); background: var(--cb-15171a,#15171a); overflow: auto; max-height: 300px; }
+.sx-table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+.sx-table td, .sx-table th { padding: 6px 10px; text-align: left; font-size: 12px; border-bottom: 1px solid rgba(var(--ov,255,255,255),.06); vertical-align: top; }
+.sx-table th { color: var(--slack-text-secondary); font-weight: 500; }
+.sx-pane code, .sx-modal code { overflow-wrap: anywhere; background: var(--cb-15171a,#15171a); padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+@media (max-width: 640px) {
+  .settings-panel { width: 100vw; max-width: 100vw; height: 100vh; max-height: 100vh; border-radius: 0; }
+  .sx-row, .sx-wrow { grid-template-columns: 1fr; gap: 6px; }
+  .sx-tab { padding: 9px 8px; }
+  .sx-steps li { font-size: 10px; padding: 4px; }
+}
+@media (prefers-reduced-motion: reduce) { .sx-switch::after { transition: none; } }
+
+.sx-info { position: relative; display: inline-block; margin-left: 6px; font-size: 12px; color: var(--slack-text-secondary); cursor: help; }
+.sx-info:hover, .sx-info:focus { color: var(--slack-accent); outline: none; }
+.sx-info::after { content: attr(data-tip); display: none; position: absolute; left: 0; top: 100%; z-index: 20; width: 240px; padding: 6px 8px; margin-top: 4px; border-radius: 6px; font-size: 12px; line-height: 1.35; white-space: normal; color: var(--slack-text, #fff); background: var(--slack-bg, #222); border: 1px solid var(--slack-border); box-shadow: 0 4px 12px rgba(0,0,0,.35); }
+.sx-info:hover::after, .sx-info:focus::after { display: block; }
+.sx-search { padding: 8px 12px 0; }
+.sx-search input { width: 100%; box-sizing: border-box; background: var(--slack-main-bg); border: 1px solid var(--slack-border); color: var(--slack-text-primary); border-radius: 4px; padding: 6px 10px; font: inherit; font-size: 13px; }
+.sx-search input:focus { outline: 1px solid var(--slack-accent); }

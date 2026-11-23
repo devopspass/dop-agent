@@ -1,0 +1,41 @@
+# Package driver: Prometheus + Alertmanager (direct HTTP APIs, not via Grafana). CLI + watcher script + skill template;
+# no polling in the bot. Generic: no host built in; every instance sets prometheus_url (and optionally alertmanager_url)
+# in options. The CLI/watcher resolve the instance (URLs, auth, token ref) from config.yaml via --instance, so secrets
+# never travel through argv/env/skills. One auth setting covers both endpoints. Off unless an instance is configured.
+id: prometheus
+title: Prometheus / Alertmanager
+type: package
+icon: icon.svg
+auth:
+  types:
+    none:
+      title: No authentication (endpoints reachable from this host)
+      fields: {}
+    basic:
+      title: HTTP basic auth (username + password ref like ${env:PROM_PASSWORD})
+      fields:
+        username: { secret: false, required: true }
+        password: { secret: true, required: true }
+    bearer:
+      title: Bearer token (ref like ${env:PROM_TOKEN})
+      fields:
+        token: { secret: true, required: true }
+options:
+  prometheus_url:   { type: string, required: true, pattern: '(?i)https?://[a-z0-9._\-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~/\-]*)?',
+                      help: "Prometheus base URL, e.g. https://prometheus.example.com (a path prefix is allowed, no trailing query)" }
+  alertmanager_url: { type: string, default: "", pattern: '(?i)(https?://[a-z0-9._\-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~/\-]*)?)?',
+                      help: "Alertmanager base URL (optional; enables am-alerts and silence commands/watchers)" }
+  title:            { type: string, pattern: '[^"`$\\<>]{0,80}', help: "Short label for lists and the skill description (default: the instance name)" }
+cli:
+  entry: cli/cli.py
+  global_args: ["--instance", "${{instance.name}}"]
+env:
+  PROMETHEUS_INSTANCE: "${{instance.name}}"
+skill:
+  template: skill/SKILL.md.tmpl
+  name: prometheus
+watchers:
+  prometheus-alerts:      { script: prometheus_watch.py, args: [alerts], emoji: "🔥", slack_emoji: ":fire:", title: Alert firing / resolved for a label filter }
+  prometheus-target-down: { script: prometheus_watch.py, args: [target-down], emoji: "🎯", slack_emoji: ":dart:", title: Scrape target went down }
+  prometheus-threshold:   { script: prometheus_watch.py, args: [threshold], emoji: "📈", slack_emoji: ":chart_with_upwards_trend:", title: PromQL expression crossed a threshold }
+version: 1

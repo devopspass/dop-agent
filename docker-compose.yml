@@ -1,0 +1,27 @@
+# Usage:  WEB_UI_PASSWORD='choose-a-strong-one' docker compose up -d --build
+# (or put WEB_UI_PASSWORD=... in a `.env` file next to this file; never commit it).
+# The Web UI is published on 127.0.0.1 only; put an authenticating TLS reverse proxy in front for remote access.
+services:
+  dop-agent:
+    build:
+      context: .
+      args:
+        INSTALL_RENDER: "${INSTALL_RENDER:-0}"
+        INSTALL_VOICE: "${INSTALL_VOICE:-0}"
+    image: dop-agent:local
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:10818:10818"
+    environment:
+      WEB_UI_PASSWORD: "${WEB_UI_PASSWORD:?set WEB_UI_PASSWORD (Web UI login password) before starting}"
+      # Extra Host header values if you reach the UI via another name/port, e.g. "myhost:10818".
+      WEB_UI_ALLOWED_HOSTS: "${WEB_UI_ALLOWED_HOSTS:-}"
+      # GitHub token with Copilot access for the agent engine (optional if you authenticate in the volume).
+      COPILOT_GITHUB_TOKEN: "${COPILOT_GITHUB_TOKEN:-}"
+    volumes:
+      - dop-agent-data:/home/dop/.dop-agent
+      - dop-agent-copilot:/home/dop/.copilot
+
+volumes:
+  dop-agent-data:
+  dop-agent-copilot:

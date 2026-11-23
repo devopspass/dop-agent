@@ -1,0 +1,43 @@
+# Package driver: Slack workspace (any workspace OTHER than the bot's own Slack adapter). CLI + watcher script + skill
+# template; no polling in the bot. Generic: no workspace is built in; every instance sets its own base_url (the
+# workspace URL, used for permalinks/link cards) and a user (xoxp-) or bot (xoxb-) token as a secret ref in config.yaml
+# (integrations.<name>.auth.token). The CLI and the watcher resolve the instance from config via --instance /
+# SLACK_WS_INSTANCE, so the token never travels through argv/env/skills. Independent of adapters.py/handlers.py.
+# Off unless an instance is configured.
+id: slack_workspace
+title: Slack workspace
+type: package
+icon: icon.svg
+auth:
+  types:
+    token:
+      title: "User (xoxp-) or bot (xoxb-) token, sent as Bearer"
+      fields:
+        token: { secret: true, required: true }
+settings:
+  base_url: { required: true, example: "https://example-team.slack.com" }
+options:
+  api_url:     { type: string, default: "https://slack.com/api", pattern: 'https://[a-z0-9.\-]+(:[0-9]{1,5})?/api',
+                 help: "Slack Web API root (change only for Enterprise Grid / GovSlack)" }
+  write_mode:  { type: string, default: confirm, pattern: '(confirm|none)',
+                 help: "confirm = `post` is a dry run until --yes, none = posting disabled (read-only instance)" }
+  title:       { type: string, pattern: '[^"`$\\<>]{0,80}', help: "Short label for lists and the skill description (default: the instance name)" }
+cli:
+  entry: cli/cli.py
+  global_args: ["--instance", "${{instance.name}}"]
+env:
+  SLACK_WS_INSTANCE: "${{instance.name}}"
+skill:
+  template: skill/SKILL.md.tmpl
+  name: slack-ws
+watchers:
+  slack-ws-new-messages: { script: slack_watch.py, args: [messages], emoji: "💬", slack_emoji: ":speech_balloon:", title: New messages in selected channels (needs --channel) }
+  slack-ws-mentions:     { script: slack_watch.py, args: [mentions], emoji: "📣", slack_emoji: ":mega:", title: New messages mentioning me in selected channels (needs --channel) }
+  slack-ws-thread-replies: { script: slack_watch.py, args: [thread], emoji: "🧵", slack_emoji: ":thread:", title: New replies in one thread (needs --channel and --thread-ts) }
+  slack-ws-channel-threads: { script: slack_watch.py, args: [threads], emoji: "🪡", slack_emoji: ":sewing_needle:", title: New replies in recent threads of a channel (needs --channel) }
+kinds:
+  message:
+    url_match: '^{base_url}/archives/(?P<channel>[CDG][A-Z0-9]{8,})/p(?P<ts>[0-9]{16})(?:[?#].*)?$'
+    url_template: '{base_url}/archives/{channel}/p{ts}'
+    card: { fields: [channel, author, posted, replies, text], icon: icon.svg, label: 'Slack message' }
+version: 1

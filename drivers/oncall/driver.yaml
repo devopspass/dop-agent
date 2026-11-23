@@ -1,0 +1,39 @@
+# Package driver: alerting & on-call for PagerDuty OR Opsgenie (standalone, `backend` option). CLI + watcher script + skill template; no bot polling.
+# Incidents/alerts, schedules and who is on call, escalation policies, services (PagerDuty) / teams (Opsgenie); writes are confirm-first.
+# NOT the JSM driver: `jsm` covers Opsgenie alerts living inside a Jira Service Management site (Atlassian token, JSM Ops API).
+# This driver talks to the standalone PagerDuty REST API v2 or the standalone Opsgenie REST API v2 with a plain API key.
+# Same token convention as the gitlab driver: the CLI/watchers resolve the instance from config.yaml via --instance, so the
+# token never travels through argv/env/skills. One instance per account/backend. Off unless an instance is configured.
+# config.yaml -> integrations.<name>: driver: oncall, base_url: https://api.pagerduty.com (EU: https://api.eu.pagerduty.com) or
+#   https://api.opsgenie.com (EU: https://api.eu.opsgenie.com), auth: {type: api_key, token: "${env:VAR}"}, options: {backend: ...}.
+id: oncall
+title: PagerDuty / Opsgenie
+type: package
+icon: icon.svg
+auth:
+  types:
+    api_key:
+      title: "API key (PagerDuty REST API key / Opsgenie API key); a ${env:X}/${file:P}/${keychain:S} ref"
+      fields:
+        token: { secret: true, required: true }
+settings:
+  base_url: { required: true, example: "https://api.pagerduty.com" }
+options:
+  backend:    { type: string, required: true, pattern: 'pagerduty|opsgenie', help: "Which service this instance talks to: pagerduty or opsgenie" }
+  from_email: { type: string, default: "none", pattern: 'none|[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+',
+                help: "PagerDuty only: email of a valid PagerDuty user, required by PagerDuty for write actions (ack, resolve, note); 'none' = writes unavailable" }
+  subdomain:  { type: string, default: "none", pattern: 'none|[a-z0-9\-]{1,63}',
+                help: "Opsgenie only: account subdomain used to build alert links (https://<subdomain>.app.opsgenie.com); 'none' = no links" }
+  title:      { type: string, pattern: '[^"`$\\<>]{0,80}', help: "Short label for lists and the skill description (default: the instance name)" }
+cli:
+  entry: cli/cli.py
+  global_args: ["--instance", "${{instance.name}}"]
+env:
+  ONCALL_INSTANCE: "${{instance.name}}"
+skill:
+  template: skill/SKILL.md.tmpl
+  name: oncall
+watchers:
+  oncall-incidents: { script: oncall_watch.py, args: [incidents], emoji: "🚨", slack_emoji: ":rotating_light:", title: "New triggered incidents / alerts (filter by service, team or query)" }
+  oncall-oncall:    { script: oncall_watch.py, args: [oncall], emoji: "📟", slack_emoji: ":pager:", title: "On-call change (one schedule or all)" }
+version: 1

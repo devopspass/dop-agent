@@ -1,0 +1,51 @@
+---
+name: ${{skill.name}}
+description: "Use when: ANY Bitbucket read or action on the ${{config.title}} instance (`${{instance.name}}`, ${{config.base_url}}) — repos, branches, pull requests, pipelines/builds, commits, and watchers."
+---
+
+# ${{skill.name}} — Bitbucket `${{instance.name}}` (${{config.base_url}})
+
+Always run the CLI with the instance flag (several Bitbucket hosts may be configured, each has its own skill):
+
+`${{driver.python}} ${{driver.cli}} --instance ${{instance.name}} <command>`
+
+The token is resolved from the integration config; never print or echo it. If the user means another Bitbucket host, use that instance's skill.
+Flavor is Cloud or Server/Data Center (see `whoami`). `<repo>` is always explicit: `workspace/slug` (Cloud) or `PROJECT_KEY/slug` (Server); PR ref = `<repo>#<n>` (a PR URL also works). `<command> -h` shows options.
+
+## Reads
+| Question | Command |
+|---|---|
+| Connection check (config, reach, auth) | `test` |
+| Who am I / repo facts / repos of a workspace or project | `whoami` / `repo-info <repo>` / `repos <workspace\|PROJECT> [--search S]` |
+| PR state, reviewers, comment counts, build status | `pr-status <repo>#<n>` |
+| Review threads (file:line, replies) / all comments | `pr-threads <repo>#<n> [--unresolved]` / `pr-comments <repo>#<n> [--limit 20]` |
+| Changed files / build statuses of a PR | `pr-files <repo>#<n>` / `pr-checks <repo>#<n>` |
+| PR lists | `pr-list --repo R [--state open\|merged\|declined\|closed\|all]` or `pr-list --mine\|--reviewer-me [--repo R]` (Server: all repos; Cloud: newest repos of the instance `workspace` option, or pass `--repo`) |
+| Pipelines (Cloud only) | `pipelines <repo> [--branch B]`, `pipeline-info <repo> <build_no> [--failed]`, `step-log-tail <repo> <build_no> <step_uuid\|name> [--lines 60] [--grep RE]` (secrets masked) |
+| Build of a branch/commit (both flavors) | `build-status <repo> <branch\|sha>` (Server/DC has build statuses, no pipelines) |
+| Branches / commits / compare | `branches <repo> [--search S]`, `commits <repo> [--ref R] [--path F]`, `commit <repo> <sha>`, `compare <repo> <base> <head>` |
+| Anything else | `api GET <path> [--fields a,b.c] [--max-chars 3000]` (relative REST path; non-GET needs `--data JSON`/`--data-file F` and `--yes`) |
+
+## Writes (draft-first)
+Without `--yes` every write only prints a `DRAFT` of what would be sent. Show the draft (instance, repo, PR, text) to the user, run again with `--yes` only after they confirm.
+`pr-comment <repo>#<n> (--body T|--body-file F) [--reply COMMENT_ID]`, `pr-approve <repo>#<n> [--undo]`, `pr-merge <repo>#<n> [--strategy merge_commit|squash|fast_forward] [--close-branch]` (strategy/close-branch: Cloud only; Server uses the repo default), `pr-create <repo> --source B [--dest <default branch>] --title T [--body-file F] [--draft]`. Thread ids: pass the id printed by `pr-threads`.
+
+## Rules
+- **Don't explore**: everything is documented here; don't read the CLI source or hunt for script paths.
+- Writes (comment, approve, merge, create) change shared state: draft in chat first, name the instance (`${{instance.name}}`) and target (repo + PR), never merge or approve unasked.
+- Large diffs/file contents: use `api GET` with `--fields`, or a git clone; save big outputs (logs) to `/tmp` and grep.
+- Cloud resolved-state of comments may be unavailable, Server marks threads open/resolved.
+
+## Watchers
+All watching is done by script watchers (token-free: no model turn until something changes) via `watch_script(script="bitbucket_watch.py", integration="${{instance.name}}", watcher=<id>)`. Scripts live in `${{driver.watch_dir}}`; never invoke them by hand, validate with `dry_run=true` and say clearly whether you ran a dry run or registered the watch. Exit 0 silent / 200 changed / other = error; the first run is a silent baseline. After creating or pushing a PR register `bitbucket-pr` (and `bitbucket-pipeline` for the branch) with `until_changed=true` instead of polling.
+
+| watcher id | Fires on | Leading args |
+|---|---|---|
+| `bitbucket-review-requested` 👀 | new open PR where I am reviewer | `review-requested [--repo R] [--limit N=30]` |
+| `bitbucket-my-pr-notes` 💬 | new human comment on my open PR | `my-pr-notes [--repo R] [--include-bots] [--max-chars N=200]` |
+| `bitbucket-my-pr-checks` 🚦 | build status of my open PR turned success/failed | `my-pr-checks [--repo R] [--limit N=30]` |
+| `bitbucket-pr` 🔀 | one PR: new comments, build finished, merged/declined | `pr --ref <repo>#<n>` |
+| `bitbucket-pipeline` ⚙️ | Cloud pipeline finished / Server build status of a branch finished | `pipeline --ref <repo>#<build_no>` (Cloud) or `pipeline --ref <repo>@<branch>` |
+
+"Me" is the owner of the instance's token. Cloud scans without `--repo` cover only the newest 20 repos of the `workspace` option; pass `--repo` for precision. Scans are bounded.
+Example: `watch_script(session_id=<id>, script="bitbucket_watch.py", watcher="bitbucket-review-requested", integration="${{instance.name}}", schedule="cron:*/10 * * * *", prompt="new PR awaiting my review: summarize", retries=3)`.

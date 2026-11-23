@@ -1,0 +1,53 @@
+---
+name: ${{skill.name}}
+description: "Use when: ANY Jira Service Management read or write on ${{config.base_url}} (${{config.title}}) — requests, queues, SLAs, alerts, on-call, and watchers."
+---
+
+# ${{skill.name}} — Jira Service Management at ${{config.base_url}} (${{config.title}})
+
+Integration instance: `${{instance.name}}`. Always run the CLI with `--instance` (the CLI resolves base URL, account and API token from config; never print or echo the token):
+
+`${{driver.python}} ${{driver.cli}} --instance ${{instance.name}} <command>`
+
+For generic Jira issues/JQL/sprints use the `jira` skill of the same site, not this one. If the user means another JSM site, use that site's own skill.
+
+## Commands
+| Need | Command |
+|---|---|
+| Service desks, request types, queues (with counts) | `desks`; `request-types DESK`; `request-type-fields DESK TYPE`; `queues DESK` |
+| Issues in a queue | `queue-issues DESK QUEUE [--limit 30]` |
+| Requests (one line each) | `requests [--ownership ALL_REQUESTS\|OWNED_REQUESTS\|PARTICIPATED_REQUESTS\|APPROVER] [--status OPEN_REQUESTS\|CLOSED_REQUESTS\|ALL_REQUESTS] [--desk ID] [--search TEXT] [--approval MY_PENDING_APPROVAL\|MY_HISTORY] [--limit 30]` |
+| One request (fields, last N comments incl. internal) | `request KEY [--comments 3]` |
+| SLAs / approvals / available transitions | `sla KEY`; `approvals KEY`; `transitions KEY` |
+| Comment (public by default) | `comment KEY "text"` or `--file f`; `--internal` for an agent-only note |
+| Transition | `transition KEY <id\|name> [--comment TEXT]` |
+| Approve / decline | `approve KEY [APPROVAL_ID]`; `decline KEY [APPROVAL_ID]` |
+| Create a request | `create --desk ID --type ID --summary S [--desc D] [--field fieldId=value ...]` (required fields: `request-type-fields`) |
+| Ops alerts | `alerts [--query 'status: open'] [--limit 30]`; `alert ID`; `alert-ack ID [--note T]`; `alert-close ID [--note T]` |
+| On-call | `teams`; `schedules`; `oncall --schedule ID\|--name TEXT [--date ISO] [--next]` (names resolved to people) |
+| Anything else | `raw desk\|ops\|jira GET\|POST\|PUT\|DELETE /path [-q k=v] [--data JSON\|--data-file f] [--jq a.b[*].c] [--max 4000]` (`desk` = `/rest/servicedeskapi`, `jira` = `/rest/api/3`, `ops` = JSM Ops `/v1`) |
+| Check the connection | `test` |
+
+Ops alert queries use the Ops query syntax, e.g. `status: open AND priority: P1`. The Ops API needs the token's account to have Ops access; if `test` reports "Ops unavailable", alerts/on-call commands will fail but requests still work.
+
+## Rules
+- **Don't explore**: every command and watcher flag is documented here; never run `--help`, `ls`/`find` for scripts, or read watcher source. Watcher scripts only run through `watch_script` (they live in `${{driver.watch_dir}}`).
+- **Writes are real actions on ${{config.base_url}}** (`comment`, `transition`, `approve`, `decline`, `create`, `alert-ack`, `alert-close`, writing `raw`): only when the user explicitly asked; preview with `--dry-run`, state the request key(s) and exact text first. A public comment is visible to the customer: default to `--internal` unless told otherwise. Approving/declining is a decision on behalf of the user: confirm the request and approval first.
+- Report requests as links `[KEY](${{config.base_url}}/browse/KEY)`.
+- Duty/daily reports: `oncall` for who is on call now/next, `requests --status OPEN_REQUESTS` or `queue-issues` for incidents; compute "days until next duty" from `oncall --next`.
+- Bound scans: `--limit`, `--desk`, `--search`; save big outputs to `/tmp` and summarize instead of pasting them whole.
+
+## Watchers (wake the session on change; do not poll JSM yourself)
+Use `watch_script` with `script="jsm_watch.py"`, `integration="${{instance.name}}"` (injects this site/account) and `watcher=<id>` (picks the icon). Read-only: exit 0 silent / 200 changed / other = error; the first run is a silent baseline. Schedule e.g. `cron:*/5 * * * *`, `retries=3`. The leading args of the chosen watcher are added automatically; pass only the extra flags.
+
+| watcher id | Fires on | Extra flags |
+|---|---|---|
+| `jsm-alerts` 🚨 | Ops alerts matching the query opened / closed | `--query 'status: open AND priority: P1'` (default `status: open`), `--limit 100`, `--report-initial` |
+| `jsm-queue` 📥 | new issues in a queue | `--desk ID --queue ID` (required), `--limit 50` |
+| `jsm-requests` 🎧 | requests new to the set or changed status | `--ownership`, `--status`, `--desk`, `--limit 30` |
+| `jsm-approvals` ✅ | requests newly waiting for my approval | `--limit 30` |
+| `jsm-sla` ⏱️ | SLA breached or due within N minutes (each once) | `--minutes 30`, `--desk ID`, `--limit 25` (one SLA call per request) |
+| `jsm-oncall` 📟 | on-call people of a schedule changed | `--schedule ID` or `--name TEXT` (required) |
+
+Example: `watch_script(session_id=<id>, script="jsm_watch.py", watcher="jsm-alerts", integration="${{instance.name}}", args=["--query", "status: open AND priority: P1"], schedule="cron:*/5 * * * *", prompt="triage new/closed alerts", retries=3)`.
+To validate a watch use `watch_script(..., dry_run=true)` and report clearly whether it was only a dry run or really registered.

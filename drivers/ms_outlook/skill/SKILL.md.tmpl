@@ -1,0 +1,57 @@
+---
+name: ${{skill.name}}
+description: "Use when: ANY Outlook mail/calendar/contacts read or action for ${{config.account}} (${{config.title}}), and Outlook watchers."
+---
+
+# ${{skill.name}} — Outlook as ${{config.account}} (${{config.title}})
+
+Integration instance: `${{instance.name}}`. Always run the CLI with the instance flags:
+
+`${{driver.python}} ${{driver.cli}} --cdp-url ${{config.cdp_url}} --account ${{config.account}} [--json] <command>`
+
+Tokens are never printed; never echo them. If the user names another Outlook account/tenant, use that account's own skill instead.
+
+## Commands
+| Need | Command |
+|---|---|
+| Who am I / accounts signed in at the browser | `whoami`, `accounts` |
+| List/search mail (prints refs m1..) | `mail-list [--folder inbox\|sent\|drafts\|archive\|deleted\|junk\|<name>] [--unread] [--from a@b] [--subject w] [--query KQL] [--since 7d\|12h\|ISO] [--top N=15] [--preview]` |
+| Read mail | `mail-read m3 [--full] [--chars N=1500]` |
+| Compose (saves DRAFT d1) | `mail-send --to a@b[,c@d] --subject S --body T` (also `--cc --bcc --html --body-file F\|-`), `mail-reply m3 --body T [--all]`, `mail-forward m3 --to a@b --body T` |
+| Really send | add `--yes` to the above, or `mail-send-draft d1 --yes` |
+| Preview only | `--dry-run` |
+| Mark / move | `mail-mark read\|unread m1 m2`, `mail-move archive m1` |
+| Folders / attachments | `mail-folders`, `mail-attachments m1 [--download DIR [--only N\|name]]` |
+| Calendar | `cal-list [--days N=7] [--start 7d\|ISO] [--top N=50]`, `cal-create "Title" 2026-12-01T09:00 2026-12-01T10:00 [--teams --location L --body T]`, `cal-delete e2` |
+| Free slots | `cal-free [--days 5] [--start ISO] [--duration 30] [--from-hour 9 --to-hour 18] [--weekends]` |
+| Contacts | `contacts [query] [--top N=25]` |
+| Check the connection (CDP, tab, token, Outlook API) | `test` |
+
+Times are local ISO. `mail-list` without `--folder` searches all folders. `--from` is the sender address; `--subject`/`--query` use search (KQL), other filters are ANDed. Refs (m1, e1, d1) come from the last list/create of that type; re-list if stale. Bodies are truncated by default; use `--full` only when needed.
+
+## Requirements
+- Browser with remote debugging at `${{config.cdp_url}}` and a signed-in **Teams** web tab (`teams.cloud.microsoft`) for `${{config.account}}`: the Outlook token (Mail/Calendars/Contacts) is read from that tab's MSAL cache via CDP, no app registration needed. Needs `pip install websocket-client`. This driver reuses the `ms_teams` driver's auth helper (shipped in the same dop-agent).
+- Expired tokens are renewed automatically (the CLI reloads the Teams tab or opens a temporary background tab). If a command fails with "No Teams tab found" or "No unexpired token", ask the user to open/refresh that tab.
+
+## Rules
+- **Don't explore, everything is documented here.** Never run `--help`, `ls`/`find` for scripts, or read the watcher source: all CLI commands and watcher flags are listed in this file, and watcher scripts are only run through `watch_script` (they live in `${{driver.watch_dir}}`, never invoke them by hand). To validate a watch use `watch_script(..., dry_run=true)` and report clearly whether it was only a dry run or really registered.
+- **Writes are real actions on `${{config.account}}`**: draft first (default, saved as draft d1), show the draft or `--dry-run`, name the account and every recipient, and use `--yes` only after explicit user approval of recipients and text. Applies to send, reply, forward, `mail-send-draft`, `cal-create` (always confirm title/time/attendees first), `cal-create --attendees` (sends invites) and every `cal-delete` (confirm which event; with attendees it also needs `--yes`). Tests go only to the user's own address.
+- `cal-create` without `--attendees` only touches the own calendar; `cal-delete` needs the event ref from `cal-list`.
+- Bound scans: use `--since`, `--top`, `--from`, `--unread` instead of listing everything; read only the mails you need. "Who wrote to me today" = `mail-list --folder inbox --since 1d --top 30`, not reading every message.
+- Save big outputs (mail bodies, attachments) to `/tmp` and grep/summarize; don't paste them whole into context.
+
+## Watchers (wake the session on change; do not poll Outlook yourself)
+Use the `watch_script` tool with `script="outlook_watch.py"`, `integration="${{instance.name}}"` (injects this account's CDP URL/account) and `watcher=<id>` (picks the icon shown in the watchers list). Read-only and token-free: exit 0 silent / 200 changed / other = error; the first run is a silent baseline (mail that arrived before it is not reported), wake text = time, sender, subject and a short snippet. Schedule e.g. `cron:*/5 * * * *`, `retries=3`.
+
+| watcher id | Fires on | Leading args |
+|---|---|---|
+| `outlook-new` 📧 | new unread inbox mail | `mail --unread --limit 20` |
+| `outlook-direct` 📨 | mail where I am a direct To recipient | `mail --to-me --exclude-self` |
+| `outlook-flagged` 🚩 | new mail that arrives flagged | `mail --flagged` |
+| `outlook-attachments` 📎 | new mail with attachments (file names, sizes, link; nothing downloaded) | `attachments` |
+| `outlook-event-soon` 📅 | event starts within the window | `event-soon --hours 24` (alternatively `--minutes N`, default 10 when neither is given) |
+| `outlook-invite` 🆕 | new meeting invite | `invite` |
+| `outlook-event-changed` 🗓️ | event in the next days moved/renamed/cancelled | `event-changed [--days D=14]` |
+
+The leading mode/flags of the chosen watcher are added automatically; pass only extra filters in `args`. Mail filters (all ANDed; also for `attachments`): `--folder NAME=inbox` (well-known name, top-level folder name or id), `--from X` repeatable (`a@b.com` exact, `@b.com` domain, else substring of name/address), `--subject REGEX`, `--match REGEX` (subject+preview), `--attachment`, `--importance high|normal|low`, `--flagged`, `--unread`, `--to-me`, `--exclude-self`. Output: `--limit N=10` lines, `--max-chars N=120` snippet, `--no-snippet`. Other modes (pass as the first arg of a watch without `watcher`, `integration` still pins the account): `thread --reply-to <msgId>|--conversation ID`, `meeting-updated`, `meeting-cancelled`, `invite-response [--response accepted|declined|tentative|any]`, `autoreply`, `bounce`, `my-invite-responses [--days D=14]`, `unread --threshold N=20`, `digest [--hours H=24]` (daily cron), `task-due [--hours H=24]`.
+Example: `watch_script(session_id=<id>, script="outlook_watch.py", watcher="outlook-new", integration="${{instance.name}}", args=["--from","@customer.com"], schedule="cron:*/5 * * * *", prompt="new customer mail: summarize and draft a reply", retries=3)`.

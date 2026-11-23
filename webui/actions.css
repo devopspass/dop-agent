@@ -1,0 +1,6 @@
+.actions-block{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}
+.actions-chip{border:1px solid var(--slack-border);border-radius:14px;padding:3px 12px;background:var(--slack-bubble-assistant-bg);color:var(--slack-text-primary);font:inherit;font-size:12.5px;cursor:pointer}
+.actions-chip:hover{border-color:var(--cb-777,#777)}
+.actions-chip:focus-visible{outline:2px solid var(--slack-link);outline-offset:1px}
+.actions-chip.primary{background:var(--slack-accent);border-color:var(--slack-accent);color:#fff}
+.actions-chip.used{opacity:.6}

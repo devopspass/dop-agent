@@ -1,0 +1,41 @@
+# Package driver: Jenkins. CLI + watcher scripts + skill template; no polling inside the bot.
+# Generic: no host is built in; every instance sets base_url + options.user + an API token
+# (config.yaml -> integrations.<name>: auth.token as ${env:X}/${file:P}/${keychain:S}). The CLI/watchers resolve the
+# instance from config.yaml via --instance, so the token never travels through argv/env/skills. Off unless configured.
+id: jenkins
+title: Jenkins
+type: package
+icon: icon.svg
+auth:
+  types:
+    api_token:
+      title: Jenkins API token (User -> Configure -> API Token; the user is options.user)
+      fields:
+        token: { secret: true, required: true }
+settings:
+  base_url: { required: true, example: https://jenkins.example.com }
+options:
+  user:  { type: string, required: true, pattern: '[A-Za-z0-9._@\-]{1,80}',
+           help: "Jenkins user name the API token belongs to" }
+  title: { type: string, pattern: '[^"`$\\<>]{0,80}', help: "Short label for lists and the skill description (default: the instance name)" }
+cli:
+  entry: cli/cli.py
+  global_args: ["--instance", "${{instance.name}}"]
+env:
+  JENKINS_INSTANCE: "${{instance.name}}"
+skill:
+  template: skill/SKILL.md.tmpl
+  name: jenkins
+watchers:
+  jenkins-build:       { script: jenkins_watch.py, args: [build], emoji: "🏗️", slack_emoji: ":building_construction:", title: Build finished/failed for a job or folder (--target) }
+  jenkins-queue-stuck: { script: jenkins_watch.py, args: [queue-stuck], emoji: "⏳", slack_emoji: ":hourglass_flowing_sand:", title: Queue items waiting too long }
+kinds:
+  build:
+    url_match: '^{base_url}/(?P<path>(?:job/[^/]+/)*job/[^/]+)/(?P<id>\d+)(?:/(?:console|consoleFull|display/redirect)?)?$'
+    url_template: '{base_url}/{path}/{id}/'
+    card: { fields: [job, result, duration], icon: icon.svg, label: 'Build #{id}' }
+  job:
+    url_match: '^{base_url}/(?P<path>(?:job/[^/]+/)*job/[^/]+)/?$'
+    url_template: '{base_url}/{path}/'
+    card: { fields: [job, last_build, result], icon: icon.svg, label: 'Job' }
+version: 1

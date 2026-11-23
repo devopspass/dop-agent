@@ -1,0 +1,32 @@
+DOP Agent
+Copyright 2026 DevOps Pass contributors
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+It includes third-party software under their own licenses; see
+THIRD_PARTY_LICENSES.md and webui/vendor/licenses/.
+
+Optional component with a copyleft license
+------------------------------------------
+The optional "render" extra (requirements-render.txt) installs PyMuPDF, which
+is available under the GNU AGPL-3.0 or a commercial Artifex license. It is NOT
+part of the core install. If you enable the extra, you are responsible for
+complying with the AGPL (including its network-use clause) or for obtaining a
+commercial license. Without it, DOP Agent falls back to text (ASCII) tables.
+
+Experimental drivers
+--------------------
+The ms_teams, ms_outlook, ms_sharepoint and powerbi drivers drive the vendors'
+web clients through a browser debugging protocol. They are experimental and
+unsupported by the vendors; use may conflict with the terms of those services.
+
+Trademarks
+----------
+Product names and brand logos in webui/icons/ and drivers/*/icon.svg (for
+example Slack, Telegram, GitLab, Jira, Confluence, Microsoft Teams, Outlook,
+SharePoint, Power BI, Argo CD) are trademarks or registered trademarks of
+their respective owners. They are used only to identify the integrations
+(nominative use); this project is not affiliated with, endorsed by, or
+sponsored by those owners, and the Apache-2.0 license does not grant any
+rights in those marks. webui/icons/logo.png is the DevOps Pass project logo
+and is owned by the project owner; the Apache-2.0 license does not grant
+trademark rights in the project name or logo.

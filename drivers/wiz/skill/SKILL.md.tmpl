@@ -1,0 +1,55 @@
+---
+name: ${{skill.name}}
+description: "Use when: ANY Wiz security read or action for the Wiz tenant `${{config.title}}` — findings, reports, rescans, and watchers."
+---
+
+# ${{skill.name}} — Wiz tenant `${{config.title}}`
+
+Integration instance: `${{instance.name}}`. Always run the CLI with the instance flags (global options go before the command):
+
+`${{driver.python}} ${{driver.cli}} --instance ${{instance.name}} --wiz-dir ${{config.wiz_dir}} --data-center ${{config.data_center}} --scope-tags ${{config.scope_tags}} --env-tag-key ${{config.env_tag_key}} --cdp-url ${{config.cdp_url}} <command>`
+
+Tokens are never printed; never echo them. If the user names another Wiz tenant, use that tenant's own skill instead.
+Scope of this instance: asset tags `${{config.scope_tags}}` (`none` = whole tenant) are ANDed into every findings query; `--env V` matches the asset tag `${{config.env_tag_key}}=V`.
+
+## Commands
+| Need | Command |
+|---|---|
+| Check the connection (python deps, wizcli, auth file, token, GraphQL) | `test` (JSON), `auth-status` |
+| Open findings (deduped) | `findings [--env V[,V]] [--tag k=v ...] [--host SUBSTR] [--severity CRITICAL,HIGH] [--status OPEN] [--format table\|json\|links\|assets] [--ticket-map F.json] [--max-pages 20]` |
+| Wiz resource UUIDs of the hosts (input for rescan) | `findings ... --format assets` |
+| Findings → ticket keys | `findings --ticket-map map.json` with `{"KEY-1": {"uuid": "<posture-issue uuid>"}}` |
+| Which hosts a package/path affects | `count-by-path --path SUBSTR [--env V] [--severity ...] [--show-paths]` |
+| Fleet snapshot / diff | `snapshot collect [--env V,V] [--asset-severities CRITICAL,HIGH] --out FILE`, `snapshot diff BEFORE AFTER [--per-asset]` |
+| Rescan (dry run without `--yes`) | `rescan --asset-id UUID [--asset-id ...] [--type VIRTUAL_MACHINE] [--yes]` |
+| Did the rescan finish? | `rescan-status --asset-id UUID [--from-map F.json]` |
+
+Default severities are CRITICAL,HIGH (scale: CRITICAL,HIGH,MEDIUM,LOW,NONE). Formats: `table` (default), `json` (piping), `links` (portal URL per finding), `assets` (host + resource UUID). `snapshot collect` writes a timestamped JSON (use a path under `/tmp` or the user's folder); per-severity counts are exact and cheap, the per-asset breakdown only covers `--asset-severities`.
+Counts by severity/age go into a chart, remediation options into an ideas list if the user wants to triage.
+
+## Requirements
+- `wizcli` installed (macOS: `brew install --cask wizcli`) and logged in for this tenant: `WIZ_DIR=${{config.wiz_dir}} wizcli auth --use-device-code`; the CLI reads/refreshes `${{config.wiz_dir}}/auth.json`. With auth type `service_account` the credentials come from the instance's config refs (resolved by `--instance`); never ask for or print them. No browser is needed for reads.
+- `rescan`/`rescan-status` (and the `wiz-rescan-done` watcher) additionally need a browser with remote debugging at `${{config.cdp_url}}` and a logged-in `app.wiz.io` tab, plus `pip install websocket-client` for the bot's Python (the `test` command reports it).
+
+## Gotchas
+- `totalCount` of an unfiltered findings query is always 0 (Wiz cost guard): never read it as "no findings"; filter by severity.
+- Findings reflect the LAST COMPLETED scan: a rescan `success` only means "queued" (several async activities follow). Check `rescan-status` (or use `wiz-rescan-done`) before re-querying findings.
+- Wiz enforces ~10 min between rescans of one resource (`status: cooldown`, wait and retry later, space several resources yourself). `error: Unauthorized` is a per-resource permission problem, not a cooldown: do not retry.
+- `findings` is truncated at `--max-pages` x 500 rows (a warning goes to stderr): narrow with `--env/--tag/--host/--severity` instead of paging more.
+
+## Rules
+- **Don't explore, everything is documented here.** Never run `--help`, `ls`/`find` for scripts, or read the watcher source: watcher scripts live in `${{driver.watch_dir}}` and are only run through `watch_script`. To validate a watch use `watch_script(..., dry_run=true)` and report clearly whether it was only a dry run or really registered.
+- Everything but `rescan` is read-only. `rescan` is a real action on the tenant: show the resources (host names, UUIDs), get the user's explicit approval, then add `--yes`.
+- Bound scans: always pass `--severity`/`--env`/`--host` when the user asks about one thing; save big outputs to `/tmp` and summarize.
+
+## Watchers (wake the session on change; do not poll Wiz yourself)
+Use `watch_script` with `script="wiz_watch.py"`, `integration="${{instance.name}}"` (injects this tenant's directory/scope) and `watcher=<id>`. Read-only and token-free for the model: exit 0 silent / 200 changed / other = error; the first run is a silent baseline. Schedule e.g. `cron:*/30 * * * *` (findings/counts) or `cron:*/5 * * * *` (rescan-done), `retries=3`.
+
+| watcher id | Fires on | Leading args | Extra flags |
+|---|---|---|---|
+| `wiz-new-findings` 🛡️ | new OPEN findings | `findings` | `--env V[,V]`, `--tag k=v` (repeatable), `--severity CRITICAL,HIGH`, `--host SUBSTR`, `--limit 10`, `--max-pages 6` |
+| `wiz-counts` 📊 | per-severity open counts changed | `counts` | `--env`, `--tag`, `--severity` (default all), `--only-increase` |
+| `wiz-rescan-done` 🔄 | all scan activities of the resource(s) finished (once per resource) | `rescan-done` | `--asset-id UUID` (repeatable, required), `--scan-id ID`, `--tab-id` |
+
+The leading mode of the chosen watcher is added automatically; pass only the extra flags in `args`.
+Example: `watch_script(session_id=<id>, script="wiz_watch.py", watcher="wiz-new-findings", integration="${{instance.name}}", args=["--env","prod","--severity","CRITICAL"], schedule="cron:*/30 * * * *", prompt="new critical Wiz findings: summarize per host and propose next steps", retries=3)`.

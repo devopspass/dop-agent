@@ -1,0 +1,55 @@
+---
+name: ${{skill.name}}
+description: "Use when: ANY GitLab read or action on the ${{config.title}} instance (`${{instance.name}}`, ${{config.base_url}}) — MRs, pipelines, jobs, branches, projects, and watchers."
+---
+
+# ${{skill.name}} — GitLab `${{instance.name}}` (${{config.base_url}})
+
+Always run the CLI with the instance flag (several GitLab hosts may be configured, each has its own skill):
+
+`${{driver.python}} ${{driver.cli}} --instance ${{instance.name}} <command>`
+
+The token is resolved from the integration config; never print or echo it. If the user means another GitLab host, use that instance's skill.
+`<proj>` = full path (`group/sub/project`) or the exact last path segment (unique, cached); MR ref = `<proj>!<iid>`. Always explicit — no cwd inference. `<command> -h` shows options.
+
+## Reads
+| Question | Command |
+|---|---|
+| Connection check (config, reach, auth) | `test` |
+| MR state, approvals, open threads, pipeline + failed jobs | `mr-status <proj>!<iid>` |
+| Review threads (file:line, 200 chars) / one note | `threads <proj>!<iid> [--unresolved]` / `note-get <proj>!<iid> <note_id>` |
+| Changed files of an MR | `mr-files <proj>!<iid>` |
+| Jobs (incl. bridges) of a pipeline / MR's latest | `pipeline-jobs <proj> <id>` or `--mr <iid> [--failed]` |
+| Pipelines of a project | `pipelines <proj> [--ref R] [--status S]` |
+| Job details / failing log | `job-info <proj> <job>` / `job-log-tail <proj> <job> [--lines 60] [--grep RE]` (ANSI+timestamps stripped, secrets masked) |
+| MR lists | `mr-list [--project P [--mine]] [--state opened\|merged\|all] [--author U] [--since D] [--until D] [--all]` (no --project = my MRs; `--all` = scope all, needed for teammates) |
+| Project / group / users | `project-info`, `group-projects <group> [--search]`, `search-projects <q>`, `users <name...>` |
+| Branches / compare / commits / tags | `branches`, `branch-diffs <proj> <from> <to>`, `commits [--ref --path]`, `commit <proj> <sha>`, `tags` |
+| CI config validation | `ci-lint <proj> [--ref R]` |
+| Anything else | `api GET <path> [--fields a,b.c] [--max-chars 3000]`; non-GET needs `--yes` (`--data JSON` / `--data-file F`) |
+
+## Writes (one-line result; ids must be explicit)
+`mr-comment <proj>!<iid> (--body T|--body-file F) [--reply DISCUSSION_ID]`, `thread-resolve <proj>!<iid> <discussion_id> [--unresolve]`, `mr-merge <proj>!<iid> [--squash] [--remove-branch] [--auto]`, `mr-approve`, `job-play|job-retry|job-cancel <proj> <job>`, `pipeline-retry|pipeline-cancel <proj> <id>`, `pipeline-create <proj> <ref> [--var K=V]`, `branch-create <proj> <name> --ref R`, `branch-delete`, `tag-create <proj> <name> --ref R [--message M]`, `tag-delete`, `mr-create <proj> --source B [--target <default-branch>] --title T [--description-file F] [--draft]`.
+Discussion ids: pass the 8-char id printed by `threads` (expanded automatically; ambiguous prefix = error).
+
+## Rules
+- **Don't explore**: everything is documented here; don't read the CLI source or hunt for script paths.
+- Writes (comment, merge, approve, retry, delete, create) change shared state: draft the text in chat first and run only after the user asks; name the instance (`${{instance.name}}`) and the target (project + id).
+- Large diffs/file contents: use the GitLab MCP tools when they are available in the session (diffs, file contents, repository tree, code search); otherwise `api GET ... --fields`.
+- Save big outputs (logs) to `/tmp` and grep; don't paste them whole into context.
+
+## Watchers
+All watching is done by script watchers (token-free: no model turn until something changes) via `watch_script(script="gitlab_watch.py", integration="${{instance.name}}", watcher=<id>)`. Scripts live in `${{driver.watch_dir}}`; never invoke them by hand, validate with `dry_run=true`. Exit 0 silent / 200 changed / other = error; the first run is a silent baseline. After every MR creation/push register `gitlab-mr` (and `gitlab-pipeline` for a branch) with `until_changed=true` and wait for it instead of polling.
+
+| watcher id | Fires on | Leading args |
+|---|---|---|
+| `gitlab-review-requested` 👀 | new open MR where I am reviewer | `review-requested [--project P] [--limit N=30]` |
+| `gitlab-assigned` 📌 | new open MR assigned to me | `assigned [--project P] [--limit N=30]` |
+| `gitlab-my-mr-pipelines` 🚦 | head pipeline of my open MR turned success/failed/canceled | `my-mr-pipelines [--project P] [--limit N=30]` |
+| `gitlab-my-mr-notes` 💬 | new human comment on my open MR | `my-mr-notes [--project P] [--include-bots] [--max-chars N=200]` |
+| `gitlab-mr` 🔀 | one MR: new human notes, head pipeline finished, merged/closed | `mr --target group/project#<mr_iid>` |
+| `gitlab-pipeline` 🚦 | one pipeline reached a terminal status | `pipeline --target group/project#<pipeline_id>` or `group/project@<ref>` |
+| `gitlab-job` ⚙️ | one job reached a terminal status | `job --target group/project#<job_id>` |
+
+`#` separates the id (not GitLab's `!`; MR iids and pipeline ids are different id spaces). The leading mode is added automatically; pass only extra filters in `args`. "Me" is the owner of the instance's token. Scans are bounded (`--limit` MRs, 5 notes per MR per run).
+Example: `watch_script(session_id=<id>, script="gitlab_watch.py", watcher="gitlab-review-requested", integration="${{instance.name}}", schedule="cron:*/10 * * * *", prompt="new MR awaiting my review: summarize", retries=3)`.

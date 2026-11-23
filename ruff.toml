@@ -1,0 +1,9 @@
+# Minimal lint config: real errors only. Unused imports/variables (F401/F841) are not enforced yet:
+# many modules re-export names that tests monkeypatch, so a blanket cleanup is a separate change.
+target-version = "py312"
+line-length = 120
+extend-exclude = ["webui", "ui_demos"]
+
+[lint]
+select = ["E9", "F"]
+ignore = ["F401", "F841"]

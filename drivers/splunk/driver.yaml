@@ -1,0 +1,35 @@
+# Package driver: Splunk Enterprise / Splunk Cloud over the management REST API (port 8089). Read-only: SPL searches
+# (async job, bounded window + result count), saved searches/reports, fired alerts, indexes, sourcetypes, job
+# status/cancel. CLI + watcher script + skill template; no polling in the bot. No host is built in; the CLI and the
+# watcher resolve the instance (base_url, token ref, options) from config.yaml via --instance, so the token never
+# travels through argv/env/skills. Off unless an instance is configured.
+id: splunk
+title: Splunk
+type: package
+icon: icon.svg
+auth:
+  types:
+    token:
+      title: Splunk authentication token (Bearer; role with search capability, e.g. user/power)
+      fields:
+        token: { secret: true, required: true }
+settings:
+  base_url: { required: true, example: "https://splunk.example.com:8089" }
+options:
+  app:         { type: string, default: "", pattern: '[A-Za-z0-9_\-]{0,64}', help: "Default Splunk app namespace for searches/saved searches (empty = all apps visible to the token)" }
+  index:       { type: string, default: "", pattern: '[A-Za-z0-9_\-]{0,64}', help: "Default index prepended to searches that name no index (empty = the role's default indexes)" }
+  verify_tls:  { type: bool, default: true, help: "Verify the TLS certificate (disable only for self-signed management ports)" }
+  max_results: { type: int, default: 100, help: "Hard cap of result rows returned by one search (CLI --count cannot exceed it)" }
+  title:       { type: string, pattern: '[^"`$\\<>]{0,80}', help: "Short label for lists and the skill description (default: the instance name)" }
+cli:
+  entry: cli/cli.py
+  global_args: ["--instance", "${{instance.name}}"]
+env:
+  SPLUNK_INSTANCE: "${{instance.name}}"
+skill:
+  template: skill/SKILL.md.tmpl
+  name: splunk
+watchers:
+  splunk-alert-fired:    { script: splunk_watch.py, args: [fired], emoji: "🚨", slack_emoji: ":rotating_light:", title: Saved-search alert fired }
+  splunk-search-results: { script: splunk_watch.py, args: [results], emoji: "🔎", slack_emoji: ":mag:", title: New results for a bounded SPL query }
+version: 1

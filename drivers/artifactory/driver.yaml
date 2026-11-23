@@ -1,0 +1,49 @@
+# Package driver: JFrog Artifactory (artifact repositories). CLI + watcher script + skill template; no polling.
+# Generic: no host is built in; every instance sets its own base_url and auth (config.yaml -> integrations.<name>),
+# several instances = several servers, one `artifactory-<instance>` skill each. The CLI and the watcher resolve the
+# instance from config.yaml via --instance / ARTIFACTORY_INSTANCE, so tokens never travel through argv/env/skills.
+# Auth: anonymous (read), access_token (secret ref in config) or sso_token (CLI mints it through browser SSO over CDP).
+# Off unless an instance is configured.
+id: artifactory
+title: JFrog Artifactory
+type: package
+icon: icon.svg
+auth:
+  types:
+    anonymous:    { title: "Anonymous (read access only, no credentials)", fields: {} }
+    access_token:
+      title: "Identity/access token (sent as Bearer)"
+      fields:
+        token: { secret: true, required: true }
+    sso_token:    { title: "Identity token minted via browser SSO (CDP), stored by the CLI (chmod 600)", fields: {} }
+settings:
+  base_url: { required: true, example: "https://artifactory.example.com" }
+options:
+  upload_mode:         { type: string, default: rest, pattern: '(rest|none)',
+                         help: "How `upload` works: rest = direct PUT (needs write permission), none = uploads disabled" }
+  cdp_url:             { type: string, default: "http://localhost:9222", pattern: '(?i)https?://[a-z0-9._\-]+(:[0-9]{1,5})?/?',
+                         help: "sso_token only: browser remote-debugging endpoint of a profile with an SSO session" }
+  title:               { type: string, pattern: '[^"`$\\<>]{0,80}', help: "Short label for lists and the skill description (default: the instance name)" }
+cli:
+  entry: cli/cli.py
+  global_args: ["--instance", "${{instance.name}}"]
+env:
+  ARTIFACTORY_INSTANCE: "${{instance.name}}"
+skill:
+  template: skill/SKILL.md.tmpl
+  name: artifactory
+watchers:
+  artifactory-new-files:   { script: artifactory_watch.py, args: [files, --new-only], emoji: "📦", slack_emoji: ":package:", title: New files in a repo folder (needs --path) }
+  artifactory-file-changes: { script: artifactory_watch.py, args: [files], emoji: "♻️", slack_emoji: ":recycle:", title: New or overwritten files in a repo folder (needs --path) }
+  artifactory-token-expiry: { script: artifactory_watch.py, args: [token-expiry], emoji: "🔑", slack_emoji: ":key:", title: Instance token about to expire }
+  artifactory-health:      { script: artifactory_watch.py, args: [health], emoji: "🩺", slack_emoji: ":stethoscope:", title: Server stopped or resumed answering }
+kinds:
+  artifact:
+    url_match: '^{base_url}/artifactory/(?P<path>[^?#]+?)/?(?:[?#].*)?$'
+    url_template: '{base_url}/artifactory/{path}'
+    card: { fields: [repo, size, modified, modifiedBy, sha256], icon: icon.svg, label: 'Artifact' }
+  artifact_ui:
+    url_match: '^{base_url}/ui/repos/tree/(?:General|Properties|Builds)/(?P<path>[^?#]+?)/?(?:[?#].*)?$'
+    url_template: '{base_url}/artifactory/{path}'
+    card: { fields: [repo, size, modified, modifiedBy, sha256], icon: icon.svg, label: 'Artifact' }
+version: 1

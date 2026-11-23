@@ -1,0 +1,43 @@
+---
+name: ${{skill.name}}
+description: "Use when: ANY ServiceNow CMDB read on ${{config.base_url}} (${{config.title}}) — configuration items, relationships, app-to-server mapping, owners, and watchers."
+---
+
+# ${{skill.name}} — ServiceNow CMDB at ${{config.base_url}} (${{config.title}})
+
+Integration instance: `${{instance.name}}`. Read-only. Always run the CLI with `--instance` (it resolves base URL and credentials from config; never print or echo the token):
+
+`${{driver.python}} ${{driver.cli}} --instance ${{instance.name}} <command>`
+
+For incidents/changes use the ServiceNow ITSM skill, not this one. REF = CI `sys_id` (32 hex) or exact CI name.
+
+## Commands
+| Need | Command |
+|---|---|
+| Find CIs | `search [--class cmdb_ci\|cmdb_ci_server\|cmdb_ci_appl\|cmdb_ci_business_app] [--name TEXT] [--ip IP] [--owner TEXT] [--group TEXT] [--where ENCODED_QUERY] [--limit 25]` (name/owner/group are substring matches) |
+| CI details | `ci REF [--class cmdb_ci_server]` |
+| Dependency tree | `rels REF [--direction down\|up\|both] [--depth 2] [--max-nodes 100]` (down = CIs the REF points to via parent→child, up = what depends on it; depth ≤ 5) |
+| App → servers | `app-servers APP [--depth 3] [--direction down\|up\|both] [--class-filter server] [--max-nodes 200]` (APP is looked up in the business-app table, then in cmdb_ci) |
+| Owners / support groups | `owners REF` |
+| Export an app's CIs | `export APP [--depth 3] [--format table\|csv] [--out FILE] [--max-nodes 500]` (prefer `--out /tmp/x.csv` for big sets) |
+| Check the connection | `test` |
+
+`--where` takes one ServiceNow encoded-query condition (no `^`), e.g. `install_status=1` or `sys_updated_on>2026-01-01`.
+Relationship direction depends on the instance's relationship types (e.g. `Runs on::Runs`); if `app-servers` finds nothing try `--direction both` and check `rels` output labels.
+
+## Rules
+- **Don't explore**: every command and watcher flag is documented here; never run `--help`, `ls`/`find` for scripts, or read watcher source. Watcher scripts only run through `watch_script` (they live in `${{driver.watch_dir}}`).
+- Nothing here writes to ServiceNow. Never ask for or print credentials.
+- Bound scans: `--limit`, `--depth`, `--max-nodes`; a `TRUNCATED` note means the result is incomplete — narrow it or raise the cap deliberately. Save big outputs to `/tmp` and summarize instead of pasting them whole.
+- For wave planning, report per app: servers (name, IP, class, env), owner, support group; flag CIs with empty owner/group.
+
+## Watchers (wake the session on change; do not poll the CMDB yourself)
+Use `watch_script` with `script="cmdb_watch.py"`, `integration="${{instance.name}}"` (injects this instance) and `watcher=<id>` (picks the icon). Read-only: exit 0 silent / 200 changed / other = error; the first run is a silent baseline. Schedule e.g. `cron:*/30 * * * *`, `retries=3`. The leading args of the chosen watcher are added automatically; pass only the extra flags.
+
+| watcher id | Fires on | Extra flags |
+|---|---|---|
+| `cmdb-ci-changed` 🗂️ | CIs matching the filter created or updated since the last run | `--class cmdb_ci_server`, `--name`, `--owner`, `--group`, `--where`, `--limit 50` |
+| `cmdb-app-members` 🔗 | CIs added to / removed from an application's dependency set | `--app NAME_OR_SYS_ID` (required), `--depth 3`, `--direction down`, `--max-nodes 300` |
+
+Example: `watch_script(session_id=<id>, script="cmdb_watch.py", watcher="cmdb-ci-changed", integration="${{instance.name}}", args=["--class", "cmdb_ci_server", "--owner", "platform-team"], schedule="cron:*/30 * * * *", prompt="summarize new/changed CIs", retries=3)`.
+To validate a watch use `watch_script(..., dry_run=true)` and report clearly whether it was only a dry run or really registered.

@@ -1,0 +1,22 @@
+# systemd --user unit template; rendered by `bot_ctl.sh install` into ~/.config/systemd/user/dop-agent.service.
+# The double-underscore tokens below are filled in with the interpreter, checkout dir, $HOME and PATH.
+# Secrets live in ~/.dop-agent/config.yaml / .env, never in this unit.
+[Unit]
+Description=DOP Agent
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+ExecStart=__PYTHON__ __DOP_AGENT_DIR__/dop_agent.py
+WorkingDirectory=__DOP_AGENT_DIR__
+Environment=HOME=__HOME__
+Environment=PATH=__PATH__
+Environment=PYTHONUNBUFFERED=1
+Restart=always
+RestartSec=10
+StandardOutput=append:__HOME__/.copilot/dop-agent.log
+StandardError=append:__HOME__/.copilot/dop-agent-error.log
+
+[Install]
+WantedBy=default.target

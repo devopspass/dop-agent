@@ -1,0 +1,51 @@
+# Package driver: ServiceNow (ITSM). CLI + watcher script + skill template; no bot polling.
+# Covers incidents, changes (state, approvals, schedule), requests/RITMs, tasks, journal comments/work notes, attachments (list),
+# a generic read-only Table API query and assignment groups. Writes (comment/work note, state transition, create incident/change)
+# are draft-first: they only print the draft until `--confirm` is passed.
+# Nothing instance-specific is built in: base URL, account and token are per-instance config
+# (config.yaml -> integrations.<name>: `base_url`, `auth: {type: basic|bearer, token: ${env:X}/${file:P}/${keychain:S}}`,
+# `options.username` for basic auth). The CLI/watchers resolve the instance from config.yaml via --instance; the token never
+# travels through argv/env/skills. Off unless an instance is configured.
+id: servicenow
+title: ServiceNow
+type: package
+icon: icon.svg
+auth:
+  types:
+    basic:
+      title: Basic auth (options.username + password/API secret as token)
+      fields:
+        token: { secret: true, required: true }
+    bearer:
+      title: OAuth bearer / API access token
+      fields:
+        token: { secret: true, required: true }
+settings:
+  base_url: { required: true, example: "https://<instance>.service-now.com" }
+options:
+  username: { type: string, default: "", pattern: '|[A-Za-z0-9._%+@\-]{1,80}',
+              help: "ServiceNow user name (required for basic auth, ignored for bearer)" }
+  title:    { type: string, pattern: '[^"`$\\<>]{0,80}', help: "Short label for lists and the skill description (default: the base URL)" }
+cli:
+  entry: cli/cli.py
+  global_args: ["--instance", "${{instance.name}}"]
+env:
+  SNOW_INSTANCE: "${{instance.name}}"
+skill:
+  template: skill/SKILL.md.tmpl
+  name: servicenow
+watchers:
+  snow-mine:    { script: snow_watch.py, args: [mine], emoji: "🎫", slack_emoji: ":ticket:", title: "My / assigned tickets changed (incidents, changes, RITMs, tasks)" }
+  snow-change:  { script: snow_watch.py, args: [change], emoji: "🔀", slack_emoji: ":twisted_rightwards_arrows:", title: "Change state or approval changed" }
+  snow-group:   { script: snow_watch.py, args: [group], emoji: "📥", slack_emoji: ":inbox_tray:", title: "New tickets in an assignment group (add --group)" }
+status_sets:
+  ticket: { new: "📋", open: "📋", assess: "🔎", authorize: "🕒", scheduled: "📅", implement: "🔧", review: "🔎", "in progress": "🔄",
+            "work in progress": "🔄", "on hold": "⏳", pending: "⏳", resolved: "✅", closed: "✅", "closed complete": "✅",
+            canceled: "🚫", cancelled: "🚫", "closed incomplete": "🚫", "closed skipped": "🚫" }
+kinds:
+  ticket:
+    status_set: ticket
+    # classic form link: /incident.do?sys_id=<32 hex> or /nav_to.do?uri=incident.do?sys_id=<32 hex> (also url-encoded)
+    url_match: '^{base_url}/(?:nav_to\.do\?uri=(?:/|%2F)?)?(?P<table>[a-z][a-z0-9_]{1,79})\.do(?:\?|%3F)(?:[^#]*?[&?])?sys_id(?:=|%3D)(?P<sys_id>[0-9a-f]{32})'
+    card: { fields: [number, summary, status, assignee], icon: icon.svg, label: '{number}' }
+version: 1

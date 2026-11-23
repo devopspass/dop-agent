@@ -1,0 +1,48 @@
+---
+name: ${{skill.name}}
+description: "Use when: ANY Kargo read/action on the ${{config.title}} instance (`${{instance.name}}`, ${{config.base_url}}) — projects, freight, stages, promotions, verification, and watchers."
+---
+
+# ${{skill.name}} — Kargo `${{instance.name}}` (${{config.base_url}})
+
+Always run the CLI with the instance flag (several Kargo servers may be configured, each has its own skill):
+
+`${{driver.python}} ${{driver.cli}} --instance ${{instance.name}} <command>`
+
+It wraps the `kargo` binary and prints compact JSON; the token is resolved from the integration config and never shown. Never run `kargo login` or the raw `kargo` binary yourself (it would use another server/identity). If the user means another Kargo, use that instance's skill.
+`--project P` (short `-p`) selects the Kargo project; without it the instance option `default_project` is used, otherwise it is an error. Put `--max-chars N` (default 6000, 0 = unlimited) before the command. `<command> -h` shows options.
+
+## Reads
+| Question | Command |
+|---|---|
+| Connection check (config, binary, server, auth) | `test` |
+| Projects / warehouses | `projects` / `warehouses [-p P]` |
+| Freight (newest first) | `freight [-p P] [--warehouse W] [--limit 15]` / `freight-info <name\|alias>` |
+| Stages: phase, health, current freight, last promotion, verification | `stages [-p P]` / `stage-info <stage>` |
+| Verification results of a stage (newest first) | `verification <stage> [--limit 3]` |
+| Promotions (newest first) | `promotions [-p P] [--stage S] [--phase Failed] [--limit 15]` |
+| One promotion: phase, message, per-step status | `promotion-info <promotion>` |
+| Verification (AnalysisRun) logs | `analysis-logs <analysis-run> [--metric M] [--lines 80]` (analysis run name comes from `verification`) |
+
+## Writes (confirm-first)
+`promote (--freight F | --alias A | --warehouse W) (--stage S | --downstream-from S) [--wait]`, `promote-abort <promotion>`, `approve (--freight F | --alias A) --stage S`, `verify <stage> [--abort]` (re-run/abort verification), `refresh warehouse|stage <name>`.
+Without `--yes` a write only prints a dry-run preview (`would_run`); it changes nothing.
+
+## Rules
+- **Don't explore**: everything is documented here; don't read the CLI source or hunt for script paths.
+- Writes change shared delivery state (promotions deploy to environments). Show the user the dry-run preview naming the instance (`${{instance.name}}`), project, stage and freight, and run with `--yes` only after the user explicitly confirms. Never promote/approve on your own initiative.
+- Names are Kubernetes-style (letters, digits, `.`, `-`); anything else is rejected.
+- Promotion phases: Pending, Running, Succeeded, Failed, Errored, Aborted. Stage health: Healthy, Unhealthy, Progressing, Unknown.
+
+## Watchers
+Script watchers (token-free: no model turn until something changes) via `watch_script(script="kargo_watch.py", integration="${{instance.name}}", watcher=<id>)`. Scripts live in `${{driver.watch_dir}}`; never invoke them by hand, validate with `dry_run=true` and report clearly whether a watch was only dry-run or really registered. Exit 0 silent / 200 changed / other = error; the first run is a silent baseline.
+
+| watcher id | Fires on | Leading args |
+|---|---|---|
+| `kargo-new-freight` 📦 | freight not seen before | `new-freight [--project P] [--warehouse W] [--limit N=50]` |
+| `kargo-promotion-result` 🚀 | promotion finished (Succeeded/Failed/Errored/Aborted) | `promotion-result [--project P] [--stage S] [--only-failed]` |
+| `kargo-stage-health` 🩺 | stage health status changed | `stage-health [--project P]` |
+| `kargo-verification-failed` 🧪 | latest verification of a stage failed | `verification-failed [--project P]` |
+
+The leading mode is added automatically; pass only extra filters in `args`. Scope: `--project`, else `default_project`, else all visible projects (max 20, `--max-projects`). Scans are bounded (`--limit` newest objects per project).
+Example: `watch_script(session_id=<id>, script="kargo_watch.py", watcher="kargo-promotion-result", integration="${{instance.name}}", args=["--only-failed"], schedule="cron:*/10 * * * *", prompt="promotion failed: summarize and propose next step", retries=3)`.

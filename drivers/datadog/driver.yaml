@@ -1,0 +1,33 @@
+# Package driver: Datadog (monitors, metrics, logs, hosts, events, dashboards, downtimes, SLOs) over the REST API.
+# CLI + watcher script + skill template; no polling in the bot. Generic: every instance sets its Datadog `site`
+# (datadoghq.eu, datadoghq.com, us3.datadoghq.com, ...) and an API key + application key (config.yaml ->
+# integrations.<name>.auth, refs like ${env:DD_API_KEY}). The CLI/watcher resolve the instance from config.yaml by
+# name (--instance / DATADOG_INSTANCE), so keys never travel through argv/env/skills. Off unless an instance is configured.
+id: datadog
+title: Datadog
+type: package
+icon: icon.svg
+auth:
+  types:
+    api_keys:
+      title: "API key + application key (app key needs monitors_read, logs_read_data, metrics_read, dashboards_read, hosts_read, slos_read, events_read; monitors_downtime to mute)"
+      fields:
+        api_key: { secret: true, required: true }
+        app_key: { secret: true, required: true }
+options:
+  site:  { type: string, default: "datadoghq.com", required: true, pattern: '(?i)([a-z0-9]{2,12}\.)?datadoghq\.(com|eu)|ddog-gov\.com|ap[0-9]\.datadoghq\.com',
+           help: "Datadog site of the organisation, e.g. datadoghq.eu, datadoghq.com, us3.datadoghq.com (API host is api.<site>)" }
+  title: { type: string, pattern: '[^"`$\\<>]{0,80}', help: "Short label for lists and the skill description (default: the instance name)" }
+cli:
+  entry: cli/cli.py
+  global_args: ["--instance", "${{instance.name}}"]
+env:
+  DATADOG_INSTANCE: "${{instance.name}}"
+skill:
+  template: skill/SKILL.md.tmpl
+  name: datadog
+watchers:
+  datadog-monitor-alert:     { script: datadog_watch.py, args: [monitors, --notify, "alert,warn,recovered"], emoji: "🐶", slack_emoji: ":dog:", title: Monitor changed to alert/warn or recovered (filter by --tags / --query) }
+  datadog-monitor-alert-only: { script: datadog_watch.py, args: [monitors, --notify, "alert"], emoji: "🚨", slack_emoji: ":rotating_light:", title: Monitor changed to Alert (filter by --tags / --query) }
+  datadog-new-log-pattern:   { script: datadog_watch.py, args: [logs], emoji: "📜", slack_emoji: ":scroll:", title: New log message pattern matching a log query (needs --query) }
+version: 1

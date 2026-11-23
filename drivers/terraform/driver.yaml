@@ -1,0 +1,42 @@
+# Package driver: Terraform — HCP Terraform (Terraform Cloud) / Terraform Enterprise. CLI + watcher script + skill template; no polling by the bot.
+# Generic: no host is built in; every instance sets its own base_url (https://app.terraform.io for HCP Terraform, the own host for TFE),
+# the organization and an API token (user/team/organization token, secret ref in config.yaml -> integrations.<name>.auth.token).
+# The CLI/watcher resolve the instance by name (tfconfig.py), so tokens never travel through argv/env/skills.
+# Read-mostly: workspaces, runs + plan summary, state outputs (names), variable names (never values), drift, policy checks.
+# Writes (trigger/apply/discard/cancel a run) are dry runs without --yes. Off unless an instance is configured.
+id: terraform
+title: Terraform (HCP / Enterprise)
+type: package
+icon: icon.svg
+auth:
+  types:
+    api_token:
+      title: "API token (user, team or organization token; ref like ${env:TFE_TOKEN})"
+      fields:
+        token: { secret: true, required: true }
+settings:
+  base_url: { required: true, example: "https://app.terraform.io" }
+options:
+  organization: { type: string, required: true, pattern: '[A-Za-z0-9_.\-]{1,90}',
+                  help: "HCP Terraform / TFE organization whose workspaces this instance reads" }
+  title:        { type: string, pattern: '[^"`$\\<>]{0,80}', help: "Short label for lists and the skill description (default: the instance name)" }
+cli:
+  entry: cli/cli.py
+  global_args: ["--instance", "${{instance.name}}"]
+env:
+  TERRAFORM_INSTANCE: "${{instance.name}}"
+skill:
+  template: skill/SKILL.md.tmpl
+  name: terraform
+watchers:
+  terraform-run-finished:   { script: terraform_watch.py, args: [runs], emoji: "🏗️", slack_emoji: ":building_construction:", title: Run reached a final state (applied/errored/...) }
+  terraform-needs-approval: { script: terraform_watch.py, args: [approval], emoji: "✋", slack_emoji: ":raised_hand:", title: Run waits for approval }
+  terraform-drift:          { script: terraform_watch.py, args: [drift], emoji: "🌊", slack_emoji: ":ocean:", title: Drift detected by health assessment }
+kinds:
+  run:
+    url_match: '^{base_url}/app/[A-Za-z0-9_.\-]+/workspaces/[A-Za-z0-9_.\-]+/runs/(?P<id>run-[A-Za-z0-9]+)/?$'
+    card: { fields: [plan, created], icon: icon.svg, label: 'Terraform run' }
+  workspace:
+    url_match: '^{base_url}/app/[A-Za-z0-9_.\-]+/workspaces/(?P<name>[A-Za-z0-9_.\-]+)/?$'
+    card: { fields: [terraform, updated], icon: icon.svg, label: 'Terraform workspace' }
+version: 1

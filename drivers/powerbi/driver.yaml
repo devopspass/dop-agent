@@ -1,0 +1,43 @@
+# Package driver: Power BI (Microsoft Fabric / Power BI service). CLI + watcher script + skill template; no polling.
+# Uses the Power BI REST token of a signed-in Power BI/Fabric web tab (read over CDP, like ms_teams/ms_outlook; a Teams
+# tab whose cache holds a Power BI token also works). Per-instance values (config.yaml -> integrations.<name>.options)
+# are injected into the skill, CLI args and watcher env through ${{config.<option>}}. Off by default.
+id: powerbi
+title: Power BI
+type: package
+icon: powerbi
+auth:
+  types:
+    cdp_edge: { title: "Power BI web tab in Edge/Chrome via CDP (no secret)", fields: {} }
+options:
+  cdp_url:   { type: string, default: "http://localhost:9222", required: true, pattern: '(?i)https?://[a-z0-9._\-]+(:[0-9]{1,5})?/?',
+               help: "Browser remote-debugging endpoint of the profile signed in to this account (http://host:port)" }
+  account:   { type: string, required: true, pattern: '[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+',
+               help: "Signed-in account (email/UPN) this instance acts as" }
+  tenant_id: { type: string, pattern: '(?i)([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?',
+               help: "AD tenant GUID; filled by the Test button; used to match Power BI links to this instance" }
+  title:     { type: string, pattern: '[^"`$\\<>]{0,80}', help: "Short label for lists and the skill description (default: the account)" }
+tenant: { option: tenant_id }
+cli:
+  entry: cli/cli.py
+  global_args: ["--cdp-url", "${{config.cdp_url}}", "--account", "${{config.account}}"]
+env:
+  POWERBI_CDP_URL: "${{config.cdp_url}}"
+  POWERBI_ACCOUNT: "${{config.account}}"
+skill:
+  template: skill/SKILL.md.tmpl
+  name: powerbi
+watchers:
+  powerbi-refresh-failed:    { script: powerbi_watch.py, args: [refresh-failed], emoji: "❌", slack_emoji: ":x:", title: Dataset refresh failed }
+  powerbi-refresh-completed: { script: powerbi_watch.py, args: [refresh-completed], emoji: "✅", slack_emoji: ":white_check_mark:", title: Dataset refresh completed }
+kinds:
+  report:
+    url_match: '^https://app\.(?:powerbi|fabric\.microsoft)\.com/(?:groups/(?P<group>[0-9a-fA-F-]{36})|me)/reports/(?P<id>[0-9a-fA-F-]{36})'
+    card: { fields: [dataset], icon: powerbi, label: 'Power BI report' }
+  dashboard:
+    url_match: '^https://app\.(?:powerbi|fabric\.microsoft)\.com/(?:groups/(?P<group>[0-9a-fA-F-]{36})|me)/dashboards/(?P<id>[0-9a-fA-F-]{36})'
+    card: { fields: [readOnly], icon: powerbi, label: 'Power BI dashboard' }
+  dataset:
+    url_match: '^https://app\.(?:powerbi|fabric\.microsoft)\.com/(?:groups/(?P<group>[0-9a-fA-F-]{36})|me)/datasets/(?P<id>[0-9a-fA-F-]{36})'
+    card: { fields: [owner, lastRefresh], icon: powerbi, label: 'Power BI dataset' }
+version: 1

@@ -1,0 +1,38 @@
+# Package driver: SharePoint / OneDrive (Microsoft 365 files) via Microsoft Graph. CLI + watcher script + skill template; no polling.
+# Uses the Graph token of a signed-in Teams web tab (read over CDP, like the ms_teams / ms_outlook drivers), so it needs a
+# Teams tab for the same account in that browser. Per-instance values (config.yaml -> integrations.<name>.options)
+# are injected into the skill, CLI args and watcher env through ${{config.<option>}}. Off by default.
+id: ms_sharepoint
+title: SharePoint / OneDrive
+type: package
+icon: sharepoint
+auth:
+  types:
+    cdp_edge: { title: "Teams web tab in Edge/Chrome via CDP (no secret)", fields: {} }
+options:
+  cdp_url:   { type: string, default: "http://localhost:9222", required: true, pattern: '(?i)https?://[a-z0-9._\-]+(:[0-9]{1,5})?/?',
+               help: "Browser remote-debugging endpoint of the profile signed in to this account (http://host:port)" }
+  account:   { type: string, required: true, pattern: '[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+',
+               help: "Signed-in account (email/UPN) this instance acts as" }
+  tenant_id: { type: string, pattern: '(?i)([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?',
+               help: "AD tenant GUID; filled by the Test button" }
+  title:     { type: string, pattern: '[^"`$\\<>]{0,80}', help: "Short label for lists and the skill description (default: the account)" }
+tenant: { option: tenant_id }
+cli:
+  entry: cli/cli.py
+  global_args: ["--cdp-url", "${{config.cdp_url}}", "--account", "${{config.account}}"]
+env:
+  SHAREPOINT_CDP_URL: "${{config.cdp_url}}"
+  SHAREPOINT_ACCOUNT: "${{config.account}}"
+skill:
+  template: skill/SKILL.md.tmpl
+  name: ms-sharepoint
+watchers:
+  sharepoint-folder: { script: sharepoint_watch.py, args: [folder], emoji: "📁", slack_emoji: ":file_folder:", title: New or changed files in a folder }
+  sharepoint-file:   { script: sharepoint_watch.py, args: [file], emoji: "📄", slack_emoji: ":page_facing_up:", title: One file changed (new version) }
+  sharepoint-site:   { script: sharepoint_watch.py, args: [site], emoji: "🗂️", slack_emoji: ":card_index_dividers:", title: Changes anywhere in a site library or OneDrive }
+kinds:
+  file:
+    url_match: '^(?P<url>https://[a-z0-9\-]+(?:-my)?\.sharepoint\.com/[^\s]+)$'
+    card: { fields: [type, modified, size], icon: sharepoint, label: 'SharePoint file' }
+version: 1

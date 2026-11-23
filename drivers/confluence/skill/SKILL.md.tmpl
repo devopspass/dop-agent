@@ -1,0 +1,48 @@
+---
+name: ${{skill.name}}
+description: "Use when: ANY Confluence read or write on ${{config.base_url}}/wiki (${{config.title}}) — search, pages, comments, attachments, and watchers."
+---
+
+# ${{skill.name}} — Confluence at ${{config.base_url}}/wiki (${{config.title}})
+
+Integration instance: `${{instance.name}}`. Always run the CLI with the instance flag (site, account and token are resolved by the CLI from config; never print or echo a token):
+
+`${{driver.python}} ${{driver.cli}} --instance ${{instance.name}} <command>`
+
+If the user means another Confluence site, use that site's own skill instead.
+
+## Commands
+| Need | Command |
+|---|---|
+| Search (CQL), one line per hit | `search "<CQL>" [--limit 10] [--links]` — e.g. `title ~ "runbook" AND space = DOC`; `--links` prints page URLs instead of ids |
+| Read a page (header line + body) | `page ID [--format text\|storage\|view] [--max-chars 20000]` — `text` strips markup; use `storage` (raw XHTML) before editing |
+| Children / comments / attachments | `children ID`, `comments ID`, `attachments ID` (each `[--limit 25]`) |
+| Spaces (key, name, id) | `spaces [--limit 25]` |
+| Create a page | `create --space KEY --title T (--body TEXT\|--file f) [--parent ID] [--storage] [--dry-run]` |
+| Update a page (version bumped automatically; replaces the whole body) | `update ID (--body TEXT\|--file f) [--title T] [--message M] [--storage] [--dry-run]` |
+| Footer comment | `comment ID (--body TEXT\|--file f) [--storage] [--dry-run]` |
+| Anything else | `raw GET\|POST\|PUT\|PATCH\|DELETE /wiki/api/v2/... [-q k=v] [--data JSON\|--data-file f] [--jq a.b[*].c] [--max 4000]` |
+| Check the connection | `test` |
+
+Body text supports paragraphs, `- ` bullets, ``` fences, `**bold**`, `` `code` ``, `[t](url)`; HTML is escaped. Use `--storage` for macros/tables/raw XHTML.
+A page id is the number in a page URL: `.../wiki/spaces/<SPACE>/pages/<ID>/<title>`.
+
+## Rules
+- **Don't explore**: every command and watcher flag is documented here; never run `--help`, `ls`/`find` for scripts, or read the watcher source. Watcher scripts are only run through `watch_script` (they live in `${{driver.watch_dir}}`).
+- **Writes are real actions on ${{config.base_url}}** (`create`, `update`, `comment`, writing `raw`): only when the user explicitly asked. Preview with `--dry-run`, state the space/page id, title and exact text first. `update` replaces the whole body: read the page with `--format storage`, edit, send it back with `--storage`; never update from the `text` view.
+- Bound scans: CQL filters (`space = X AND lastmodified > now("-7d")`), `--limit`, `--max-chars`; save big outputs to `/tmp` and summarize them instead of pasting them whole.
+- Never delete pages through `raw` unless the user asked for exactly that.
+
+## Watchers (wake the session on change; do not poll Confluence yourself)
+`watch_script` with `script="confluence_watch.py"`, `integration="${{instance.name}}"` (injects this site/account) and `watcher=<id>` (picks the icon in the watchers list). Read-only: exit 0 silent / 200 changed / other = error; the first run is a silent baseline (content already matching is not reported); wake text = id, `[new]`/`[updated]`, title, space, version, author, link. Schedule e.g. `cron:*/15 * * * *`, `retries=3`.
+
+| watcher id | Fires on | Leading args (added automatically) |
+|---|---|---|
+| `confluence-mentions` 📣 | pages that mention me, new to the set or updated | `cql "mention = currentUser() AND type in (page,blogpost)"` |
+| `confluence-mine` 📝 | pages I created that were changed | `cql "creator = currentUser() AND ..."` |
+| `confluence-space` 🗂️ | new or updated pages/blog posts of a space | `space` — put the space key first in `args` |
+| `confluence-cql` 🔎 | content matching your CQL, new or updated | `cql` — put the CQL first in `args` |
+| `confluence-page` 📄 | one page: new version or new footer comments | `page` — put the page id first in `args` |
+
+Extra flags for cql/space: `--new-only` (ignore updates of already-seen content), `--limit N=30` (max 100). Example: `watch_script(session_id=<id>, script="confluence_watch.py", watcher="confluence-space", integration="${{instance.name}}", args=["DOC", "--new-only"], schedule="cron:*/15 * * * *", prompt="new page: summarize", retries=3)`.
+To validate a watch use `watch_script(..., dry_run=true)` and report clearly whether it was only a dry run or really registered.

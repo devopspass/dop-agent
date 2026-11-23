@@ -1,0 +1,166 @@
+/* Light theme: palette overrides. Applied via <html data-theme="light"> (see theme.js). */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --ov: 0,0,0;
+  --slack-sidebar-bg: #efebf2;
+  --slack-sidebar-header-bg: #e6e1ea;
+  --slack-sidebar-hover: #ddd7e3;
+  --slack-sidebar-border: #d3ccda;
+  --slack-main-bg: #f7f8fa;
+  --slack-bubble-assistant-bg: #fdfdfe;
+  --slack-bubble-user-bg: #e9ecf0;
+  --slack-bubble-system-bg: #e9ecf0;
+  --slack-text-primary: #353a41;
+  --slack-text-secondary: #626872;
+  --slack-border: #d8dce1;
+  --slack-link: #0b5cad;
+  --cb-0e1116: #fafbfc;
+  --cb-0f1113: #fbfbfc;
+  --cb-111: #fbfbfb;
+  --cb-15171a: #fbfbfc;
+  --cb-15181c: #fbfbfc;
+  --cb-1a1d21: #fbfbfc;
+  --cb-1a1d29: #fafbfc;
+  --cb-1b1e22: #fbfbfc;
+  --cb-1c1f23: #fbfbfc;
+  --cb-1d2a27: #f9fbfb;
+  --cb-1e2125: #fbfbfc;
+  --cb-1f2227: #fafafb;
+  --cb-212428: #f9f9fa;
+  --cb-222: #fbfbfb;
+  --cb-222427: #f9f9fa;
+  --cb-222529: #f7f8f9;
+  --cb-22262b: #f6f7f8;
+  --cb-23262e: #f4f4f6;
+  --cb-23272d: #f4f5f7;
+  --cb-262a30: #f1f2f4;
+  --cb-282c32: #eff0f2;
+  --cb-2b1d2e: #f9f7fa;
+  --cb-2b2d31: #efeff1;
+  --cb-2b2f33: #edeff0;
+  --cb-2c3044: #e0e2eb;
+  --cb-2d3136: #eaecee;
+  --cb-2f3540: #e2e5ea;
+  --cb-35373b: #e4e5e7;
+  --cb-3a3d42: #dedfe2;
+  --cb-3a3f4a: #d7dae0;
+  --cb-444: #dadada;
+  --cb-454a58: #c9ccd5;
+  --cb-4a4d52: #cdcfd2;
+  --cb-4a4f55: #cbced1;
+  --cb-4a4f57: #c9ccd1;
+  --cb-555: #c9c9c9;
+  --cb-565856: #c6c7c6;
+  --cb-5a6068: #b8bcc1;
+  --cb-616061: #bdbdbd;
+  --cb-666: #b8b8b8;
+  --cb-6b6f76: #a9acb1;
+  --cb-6b7075: #aaaeb1;
+  --cb-777: #a7a7a7;
+  --ct-6bd1b0: #2c8c6d;
+  --ct-6c8ef5: #0e35aa;
+  --ct-6cc7ff: #0e6eaa;
+  --ct-7ee2a8: #229653;
+  --ct-888: #737373;
+  --ct-8f9194: #707275;
+  --ct-8fbf8f: #437543;
+  --ct-999: #737373;
+  --ct-9a958a: #7b766a;
+  --ct-9a9a9a: #727272;
+  --ct-9a9b9e: #6d6f72;
+  --ct-9aa0a6: #656c73;
+  --ct-9cd0f2: #156ba2;
+  --ct-9fd6ff: #0e67aa;
+  --ct-a898b2: #6a5876;
+  --ct-aaa: #626262;
+  --ct-ababad: #5f5f61;
+  --ct-bbb: #515151;
+  --ct-bcabbc: #624e62;
+  --ct-bfe3d3: #388060;
+  --ct-ccc: #454a51;
+  --ct-cfc3cf: #4a3b4a;
+  --ct-cfd: #0b7a30;
+  --ct-d1d2d3: #383a3b;
+  --ct-d6d8dd: #2e3037;
+  --ct-d7e6f2: #2d618b;
+  --ct-d9a441: #996e1f;
+  --ct-ddbb66: #967521;
+  --ct-ddd: #383d44;
+  --ct-e0707a: #97212b;
+  --ct-e0b43c: #9e7b19;
+  --ct-e0b64c: #9c781b;
+  --ct-e4e9ee: #1b232b;
+  --ct-e8912d: #a56112;
+  --ct-e8dce8: #322132;
+  --ct-e8dde8: #312131;
+  --ct-e8e8e8: #353a41;
+  --ct-ecb22e: #a87a0f;
+  --ct-eee: #30353b;
+  --ct-ff9b9b: #aa0e0e;
+  --ct-fff: #2b3036;
+  --ct-ffffff: #2b3036;
+}
+
+/* ---- Hand-tuned overrides (light) ---- */
+:root[data-theme="light"] {
+  --slack-accent: #0b5cad;
+  --slack-sidebar-active: #0b5cad;
+}
+/* Active session row stays a saturated blue: keep its text white (AA >= 7:1). */
+:root[data-theme="light"] .session-item.active,
+:root[data-theme="light"] .session-item.active .session-title,
+:root[data-theme="light"] .session-item.active .session-preview,
+:root[data-theme="light"] .session-item.active .session-meta { color: #fff; }
+:root[data-theme="light"] .session-item.active .session-meta,
+:root[data-theme="light"] .session-item.active .session-preview { opacity: .92; }
+:root[data-theme="light"] .session-item .session-archive-btn,
+:root[data-theme="light"] .session-item .session-pin-btn { color: #3a3a3c; }
+:root[data-theme="light"] .session-item.active .session-archive-btn,
+:root[data-theme="light"] .session-item.active .session-pin-btn { color: #fff; }
+:root[data-theme="light"] .msg-hover-time { opacity: 1; color: #5a595a; }
+:root[data-theme="light"] .ctx-empty { opacity: 1; color: #5a595a; }
+:root[data-theme="light"] kbd { opacity: 1; }
+:root[data-theme="light"] :not(pre) > code { color: #3a3f46; }
+:root[data-theme="light"] .sx-env { color: #5f6165; }
+:root[data-theme="light"] .sx-b-hot { color: #12663f; }
+:root[data-theme="light"] .sx-b-file { color: #0b4f80; }
+:root[data-theme="light"] .sx-b-restart { color: #7a5600; }
+:root[data-theme="light"] .sx-primary:disabled,
+:root[data-theme="light"] .sx-btn:disabled { opacity: .6; }
+:root[data-theme="light"] .sx-btn:disabled:not(.sx-primary) { color: #4a4a4c; }
+/* highlight.js github.min.css: darken the few tokens below 4.5:1 on the light code surface */
+:root[data-theme="light"] .hljs-keyword,
+:root[data-theme="light"] .hljs-doctag { color: #c4202f; }
+:root[data-theme="light"] .hljs-built_in,
+:root[data-theme="light"] .hljs-literal { color: #b24a00; }
+:root[data-theme="light"] .hljs-addition { color: #1a6b2e; }
+:root[data-theme="light"] .hljs-comment { color: #5a6270; }
+:root[data-theme="light"] .login-box button:hover { background: #0b4f80; }
+:root[data-theme="light"] ::-webkit-scrollbar-thumb { background: rgba(0, 0, 0, 0.25); }
+
+#theme-toggle { background: none; border: 0; cursor: pointer; font-size: inherit; font-family: inherit; padding: 0 6px; }
+
+/* Smooth theme flip (class set briefly by theme.js; skipped under reduced motion) */
+html.theme-anim, html.theme-anim *, html.theme-anim *::before, html.theme-anim *::after {
+  transition: background-color .2s ease, border-color .2s ease, color .2s ease, fill .2s ease, stroke .2s ease !important;
+}
+@media (prefers-reduced-motion: reduce) { html.theme-anim * { transition: none !important; } }
+
+#theme-toggle { color: inherit; border-radius: 4px; }
+#theme-toggle:hover { text-decoration: underline; }
+#theme-toggle:focus-visible, .health-strip-link:focus-visible,
+:root[data-theme="light"] button:focus-visible, :root[data-theme="light"] a:focus-visible,
+:root[data-theme="light"] select:focus-visible, :root[data-theme="light"] summary:focus-visible {
+  outline: 2px solid var(--slack-accent); outline-offset: 2px;
+}
+:root[data-theme="light"] ::selection { background: #b6d4f5; color: #000; }
+@media (prefers-contrast: more) {
+  :root[data-theme="light"] { --slack-border: #8a8d91; --slack-text-secondary: #3f3e3f; }
+}
+
+/* Fills/indicators hard-coded for the dark theme */
+:root[data-theme="light"] .group-chip.active { background: #d9e6f5; border-color: #9fbbdc; color: #17406e; border-left-color: var(--group-color, #0b5cad); }
+:root[data-theme="light"] .group-chip.drag-over { outline-color: var(--slack-accent); }
+:root[data-theme="light"] .session-item.drag-over { box-shadow: inset 0 2px 0 0 var(--slack-accent); }
+:root[data-theme="light"] .session-item.reorder-before { box-shadow: inset 0 3px 0 0 var(--slack-accent); }
+:root[data-theme="light"] .session-item.reorder-after { box-shadow: inset 0 -3px 0 0 var(--slack-accent); }

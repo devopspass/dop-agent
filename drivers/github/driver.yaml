@@ -1,0 +1,58 @@
+# Package driver: GitHub (github.com and GitHub Enterprise Server/Cloud). CLI + watcher scripts + skill template; no polling
+# in the bot (watchers are token-free `script` watches). Generic: no host is built in; every instance sets its own base_url
+# (the WEB url, e.g. https://github.com or https://ghe.example.com) + token (config.yaml -> integrations.<name>); several
+# instances = several hosts. The API endpoints are derived from base_url (github.com -> api.github.com, *.ghe.com ->
+# api.<sub>.ghe.com, else <base>/api/v3) unless options.api_url is set. The CLI/watcher scripts resolve the instance from
+# config.yaml via --instance, so tokens never travel through argv/env/skills. Off unless an instance is configured.
+id: github
+title: GitHub
+type: package
+auth:
+  types:
+    private_token:
+      title: Personal access token (classic scopes repo + workflow, or fine-grained with the same access)
+      fields:
+        token: { secret: true, required: true }
+settings:
+  base_url: { required: true, example: https://github.com }
+options:
+  api_url: { type: string, default: "", pattern: '(?i)(https?://[a-z0-9._\-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~\-/]*)?)?',
+             help: "REST API endpoint override (default: derived from base_url; GitHub Enterprise Server is <base_url>/api/v3)" }
+  title:   { type: string, pattern: '[^"`$\\<>]{0,80}', help: "Short label for lists and the skill description (default: the instance name)" }
+cli:
+  entry: cli/cli.py
+  global_args: ["--instance", "${{instance.name}}"]
+env:
+  GITHUB_INSTANCE: "${{instance.name}}"
+skill:
+  template: skill/SKILL.md.tmpl
+  name: github
+watchers:
+  github-review-requested: { script: github_watch.py, args: [review-requested], emoji: "👀", slack_emoji: ":eyes:", title: PRs where my review is requested }
+  github-assigned:         { script: github_watch.py, args: [assigned], emoji: "📌", slack_emoji: ":pushpin:", title: PRs assigned to me }
+  github-my-pr-checks:     { script: github_watch.py, args: [my-pr-checks], emoji: "🚦", slack_emoji: ":vertical_traffic_light:", title: Checks finished on my open PRs }
+  github-my-pr-notes:      { script: github_watch.py, args: [my-pr-notes], emoji: "💬", slack_emoji: ":speech_balloon:", title: New comments and reviews on my open PRs }
+  github-pr:               { script: github_watch.py, args: [pr], emoji: "🔀", slack_emoji: ":twisted_rightwards_arrows:", title: One PR (comments, reviews, checks, merged/closed) }
+  github-run:              { script: github_watch.py, args: [run], emoji: "⚙️", slack_emoji: ":gear:", title: GitHub Actions - one workflow run finished (result + failed jobs) }
+  github-branch-runs:      { script: github_watch.py, args: [branch-runs], emoji: "🏃", slack_emoji: ":runner:", title: GitHub Actions - runs finished in a repo (optionally one branch/workflow) }
+status_sets:
+  pr: { open: "🟢", draft: "⚪", merged: "🟣", closed: "🔴" }
+  issue: { open: "🟢", closed: "🟣" }
+  run: { success: "✅", failure: "❌", cancelled: "🚫", in_progress: "🔄", queued: "⏳", skipped: "⏭️", timed_out: "⌛" }
+kinds:
+  pull_request:
+    url_match: '^{base_url}/(?P<repo>[^/\s]+/[^/\s]+)/pull/(?P<id>\d+)(?:[/?#].*)?$'
+    url_template: '{base_url}/{repo}/pull/{id}'
+    status_set: pr
+    card: { fields: [title, state, checks, author, branch], icon: icon.svg, label: '{repo}#{id}' }
+  issue:
+    url_match: '^{base_url}/(?P<repo>[^/\s]+/[^/\s]+)/issues/(?P<id>\d+)(?:[/?#].*)?$'
+    url_template: '{base_url}/{repo}/issues/{id}'
+    status_set: issue
+    card: { fields: [title, state, author, comments], icon: icon.svg, label: '{repo}#{id}' }
+  run:
+    url_match: '^{base_url}/(?P<repo>[^/\s]+/[^/\s]+)/actions/runs/(?P<id>\d+)(?:[/?#].*)?$'
+    url_template: '{base_url}/{repo}/actions/runs/{id}'
+    status_set: run
+    card: { fields: [name, status, branch, event], icon: icon.svg, label: 'Run #{id}' }
+version: 1

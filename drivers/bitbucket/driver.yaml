@@ -1,0 +1,60 @@
+# Package driver: Atlassian Bitbucket (Cloud and Server/Data Center). CLI + watcher scripts + skill template; no polling in the
+# bot (watchers are token-free `script` watches). Generic: no host is built in; every instance sets its own base_url (the WEB
+# url, e.g. https://bitbucket.org or https://bitbucket.example.com) + token (config.yaml -> integrations.<name>). The flavor
+# is `auto` (bitbucket.org = cloud, anything else = server) unless options.flavor is set; the REST root is derived from
+# base_url unless options.api_url is set. Auth: a token alone = Bearer (workspace/repository/project/HTTP access token);
+# with auth.username = Basic (Cloud API token + Atlassian e-mail, or app password + username). The CLI/watcher scripts resolve
+# the instance from config.yaml via --instance, so tokens never travel through argv/env/skills. Off unless configured.
+id: bitbucket
+title: Bitbucket
+type: package
+icon: icon.svg
+auth:
+  types:
+    private_token:
+      title: Access token (Bearer), or API token / app password together with username (Basic)
+      fields:
+        token: { secret: true, required: true }
+        username: { secret: false, required: false }
+settings:
+  base_url: { required: true, example: https://bitbucket.org }
+options:
+  flavor:    { type: string, default: auto, pattern: '(auto|cloud|server)', help: "auto = cloud for bitbucket.org, server (Data Center) for any other host" }
+  api_url:   { type: string, default: "", pattern: '(?i)(https?://[a-z0-9._\-]+(:[0-9]{1,5})?(/[A-Za-z0-9._~\-/]*)?)?',
+               help: "REST API root override (default: Cloud https://api.bitbucket.org/2.0, Server <base_url>/rest/api/1.0)" }
+  workspace: { type: string, default: "", pattern: '([A-Za-z0-9_.-]{1,60})?', help: "Cloud only: default workspace slug that cross-repo watchers/lists scan (newest repos)" }
+  title:     { type: string, pattern: '[^"`$\\<>]{0,80}', help: "Short label for lists and the skill description (default: the instance name)" }
+cli:
+  entry: cli/cli.py
+  global_args: ["--instance", "${{instance.name}}"]
+env:
+  BITBUCKET_INSTANCE: "${{instance.name}}"
+skill:
+  template: skill/SKILL.md.tmpl
+  name: bitbucket
+watchers:
+  bitbucket-review-requested: { script: bitbucket_watch.py, args: [review-requested], emoji: "👀", slack_emoji: ":eyes:", title: PRs where my review is requested }
+  bitbucket-my-pr-notes:      { script: bitbucket_watch.py, args: [my-pr-notes], emoji: "💬", slack_emoji: ":speech_balloon:", title: New comments on my open PRs }
+  bitbucket-my-pr-checks:     { script: bitbucket_watch.py, args: [my-pr-checks], emoji: "🚦", slack_emoji: ":vertical_traffic_light:", title: Build status finished on my open PRs }
+  bitbucket-pr:               { script: bitbucket_watch.py, args: [pr], emoji: "🔀", slack_emoji: ":twisted_rightwards_arrows:", title: One PR (comments, build status, merged/declined) }
+  bitbucket-pipeline:         { script: bitbucket_watch.py, args: [pipeline], emoji: "⚙️", slack_emoji: ":gear:", title: Pipeline finished (Cloud pipeline or Server build status of a branch) }
+status_sets:
+  pr: { open: "🟢", draft: "⚪", merged: "🟣", declined: "🔴" }
+  pipeline: { success: "✅", failed: "❌", running: "🔄", canceled: "🚫" }
+kinds:
+  pull_request:                                   # Cloud: https://bitbucket.org/<workspace>/<slug>/pull-requests/<n>
+    url_match: '^{base_url}/(?P<repo>[^/\s]+/[^/\s]+)/pull-requests/(?P<id>\d+)(?:[/?#].*)?$'
+    url_template: '{base_url}/{repo}/pull-requests/{id}'
+    status_set: pr
+    card: { fields: [title, state, checks, approvals, author, branch], icon: icon.svg, label: '{repo}#{id}' }
+  pull_request_server:                            # Server/DC: <base>/projects/<KEY>/repos/<slug>/pull-requests/<n>
+    url_match: '^{base_url}/projects/(?P<project>[^/\s]+)/repos/(?P<slug>[^/\s]+)/pull-requests/(?P<id>\d+)(?:[/?#].*)?$'
+    url_template: '{base_url}/projects/{project}/repos/{slug}/pull-requests/{id}'
+    status_set: pr
+    card: { fields: [title, state, checks, approvals, author, branch], icon: icon.svg, label: '{project}/{slug}#{id}' }
+  pipeline:                                       # Cloud: https://bitbucket.org/<workspace>/<slug>/pipelines/results/<build>
+    url_match: '^{base_url}/(?P<repo>[^/\s]+/[^/\s]+)/pipelines/results/(?P<id>\d+)(?:[/?#].*)?$'
+    url_template: '{base_url}/{repo}/pipelines/results/{id}'
+    status_set: pipeline
+    card: { fields: [status, ref, repo, duration], icon: icon.svg, label: 'Pipeline #{id}' }
+version: 1

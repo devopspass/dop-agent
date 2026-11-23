@@ -1,0 +1,46 @@
+---
+name: ${{skill.name}}
+description: "Use when: ANY Prometheus / Alertmanager read or action on ${{config.prometheus_url}} (`${{config.title}}`) — PromQL queries, targets, alerts and rules, silences, and watchers."
+---
+
+# ${{skill.name}} — Prometheus `${{instance.name}}` (${{config.prometheus_url}})
+
+Always run the CLI with the instance flag (several Prometheus servers may be configured, each has its own skill):
+
+`${{driver.python}} ${{driver.cli}} --instance ${{instance.name}} <command>`
+
+Credentials come from the integration config; never print or echo them. Output is compact JSON; `--max-chars N` (default 6000, 0 = unlimited) cuts long output. Alertmanager commands (`am-alerts`, `silences`, `silence-*`) need the `alertmanager_url` option of this instance (when it is unset they fail with a clear error: tell the user to configure it).
+
+## Reads
+| Need | Command |
+|---|---|
+| Connection check (config, Prometheus, targets, Alertmanager) | `test` |
+| Instant PromQL | `query 'EXPR' [--time T] [--series 20]` |
+| Range PromQL (summarized: last/min/max/avg per series, not raw samples) | `range 'EXPR' [--range 1h] [--step auto\|60s] [--series 20]` — bounded to 7d and 500 points |
+| Scrape targets and health | `targets [--health down\|up\|all] [--job J] [--limit 100]` |
+| Alert / recording rules | `rules [--type alert\|record] [--state firing\|pending\|inactive] [--name SUBSTR] [--limit 50]` |
+| Active alerts (Prometheus) | `alerts [--state firing\|pending\|all] [--label k=v ...]` |
+| Discovery | `metrics [--filter S]`, `labels [--match SEL]`, `label-values NAME [--match SEL] [--filter S]`, `series 'SELECTOR'`, `metadata [--metric M]` |
+| Alertmanager alerts | `am-alerts [--silenced] [--inhibited] [--label k=v ...]` |
+| Silences | `silences [--state active\|pending\|expired\|all]` |
+
+Prefer aggregations (`sum by (...)`, `topk`) over raw selectors; for "what is the trend" use `range`, for "right now" use `query`.
+
+## Writes (dry run by default)
+`silence-create --matcher 'alertname=Foo' [--matcher 'env=~prod.*'] --duration 2h --comment 'why' [--created-by NAME] [--yes]`, `silence-expire ID [--yes]`. Matcher ops: `=`, `!=`, `=~`, `!~`. Without `--yes` they only print what would happen. Silences hide alerts for other people: show the dry run, name the instance (`${{instance.name}}`), matchers, duration and comment, and add `--yes` only after the user explicitly confirmed. Match-everything silences are refused.
+
+## Rules
+- **Don't explore**: everything is documented here; don't read the CLI source or hunt for script paths (use `-h` of a command if a flag is unclear).
+- Bound scans: use `--limit`, `--match`, short `--range`; save big outputs to `/tmp` and grep.
+- If this identity cannot access something, say so; don't hunt for other credentials.
+
+## Watchers
+Token-free script watches (no model turn until something changes): `watch_script(script="prometheus_watch.py", integration="${{instance.name}}", watcher=<id>)`. Scripts live in `${{driver.watch_dir}}`, never invoke them by hand; validate with `dry_run=true` and report clearly whether it was only a dry run or really registered. Exit 0 silent / 200 changed / other = error; the first run is a silent baseline.
+
+| watcher id | Fires on | Args (the leading mode is added automatically) |
+|---|---|---|
+| `prometheus-alerts` 🔥 | alert newly firing (`--resolved`: also when it stops) | `[--source prometheus\|alertmanager] [--label k=v ...] [--name SUBSTR] [--resolved] [--limit 200]` |
+| `prometheus-target-down` 🎯 | target health turned down (`--resolved`: up again) | `[--job J] [--label k=v ...] [--resolved] [--limit 500]` |
+| `prometheus-threshold` 📈 | PromQL series newly crossing a threshold | `--query 'EXPR' --value N [--op gt\|ge\|lt\|le\|eq\|ne] [--resolved] [--limit 100]` |
+
+Example: `watch_script(session_id=<id>, script="prometheus_watch.py", watcher="prometheus-alerts", integration="${{instance.name}}", args=["--label","severity=critical","--resolved"], schedule="cron:*/5 * * * *", prompt="critical alert changed: check targets/queries and summarize", retries=3)`.

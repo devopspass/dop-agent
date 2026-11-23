@@ -1,0 +1,53 @@
+---
+name: ${{skill.name}}
+description: "Use when: ANY Datadog read/action on `${{config.site}}` (`${{config.title}}`) — monitors, metrics, logs, hosts, dashboards, downtimes, SLOs, and watchers."
+---
+
+# ${{skill.name}} — Datadog `${{instance.name}}` (site ${{config.site}})
+
+Run the CLI with the instance flag (several Datadog orgs may be configured, each has its own skill):
+
+`${{driver.python}} ${{driver.cli}} --instance ${{instance.name}} <command>`
+
+API key + application key come from the integration config; never print, echo or `cat` them. If the user means another Datadog org, use that instance's skill. Output is compact and bounded; add `--limit`, narrow queries and time windows instead of dumping.
+
+## Commands
+| Need | Command |
+|---|---|
+| Connection check (config, API key, app key, scopes) | `test` |
+| Monitors by tag/name/state | `monitors [--tags a:b,c:d] [--name T] [--state alert\|warn\|no-data\|ok] [--limit 50]` |
+| Monitor search syntax | `monitor-search 'status:alert tag:team:x' [--limit 30]` |
+| One monitor | `monitor <id>` |
+| Metrics timeseries (min/avg/max/last + points) | `metrics '<query>' [--from 1h] [--to now] [--points 8]` e.g. `'avg:system.cpu.user{env:prod} by {host}'` |
+| Logs search | `logs '<query>' [--from 15m] [--to now] [--limit 30] [--full]` e.g. `'service:api status:error'` |
+| Hosts / tags | `hosts [--filter T] [--limit 50]`; `host-tags [HOST]` (no host = tag keys summary) |
+| Events | `events [--from 1h] [--tags t1,t2] [--priority normal\|low] [--limit 30]` |
+| Dashboards | `dashboards [--query T]`; `dashboard <id>` (variables + widgets summary) |
+| Downtimes | `downtimes [--all]` (default only active) |
+| SLOs | `slos [--query T] [--tags t]`; `slo <id> [--window 7d]` |
+| Mute / unmute a monitor | `mute <monitor_id> [--duration 1h] [--message T]`; `unmute <monitor_id>` — add `--yes` to really change |
+
+Times: `now`, `15m`, `2h`, `7d`, epoch seconds or ISO-8601. Ids are numeric (monitors) or Datadog slugs (dashboards `abc-def-ghi`, SLO hashes).
+
+## Write safety (mute/unmute — confirm first)
+1. Run without `--yes` (plan only): shows the monitor name/state, duration and end time (or the downtimes to be cancelled).
+2. Show that to the user and ask for confirmation; mute only a monitor the user named explicitly and keep the duration short.
+3. Re-run with `--yes`. `mute` creates a downtime scoped to that single monitor; `unmute` cancels its active downtimes. Verify with `downtimes`.
+Mute needs an app key with `monitors_downtime`; reads need the read scopes (`test` reports what is missing).
+
+## Rules
+- **Don't explore.** Everything is documented here: no `--help`, no `ls`/`find` for scripts, no reading watcher source. Watcher scripts (in `${{driver.watch_dir}}`) run only through `watch_script`; to validate a watch use `dry_run=true` and report clearly whether it was only a dry run or really registered.
+- Bound scans: metrics with a tag filter and a short window; logs with a narrow query and `--limit`; save big outputs to `/tmp` and grep.
+- Log messages may contain secrets/PII: quote only what is needed.
+
+## Watchers (wake the session on change; do not poll Datadog yourself)
+Use `watch_script` with `script="datadog_watch.py"`, `integration="${{instance.name}}"` (pins this org) and `watcher=<id>`. Read-only; exit 0 silent / 200 changed / other = error; the first run is a silent baseline. Schedule e.g. `cron:*/5 * * * *`, `retries=3`.
+
+| watcher id | Fires on | Leading args / extra |
+|---|---|---|
+| `datadog-monitor-alert` 🐶 | selected monitors changing to Alert/Warn or recovering to OK | `monitors --notify alert,warn,recovered` + at least one of `--tags a:b` `--name T` `--query '<monitor search>'` [`--notify` to narrow, `--include-new`, `--limit N=300`] |
+| `datadog-monitor-alert-only` 🚨 | selected monitors changing to Alert | `monitors --notify alert` + same filters |
+| `datadog-new-log-pattern` 📜 | a log message pattern not seen before (numbers/ids normalized) | `logs` + `--query '<log query>'` [`--window 15m`, `--limit N=300`] (use a run schedule at most the window length) |
+
+The leading mode of the chosen watcher is added automatically; pass only the extra flags in `args`.
+Example: `watch_script(session_id=<id>, script="datadog_watch.py", watcher="datadog-monitor-alert", integration="${{instance.name}}", args=["--tags","team:payments"], schedule="cron:*/5 * * * *", prompt="a monitor changed state: report name, state, link, and check recent logs/metrics for the cause", retries=3)`.

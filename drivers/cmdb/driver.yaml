@@ -1,0 +1,45 @@
+# Package driver: ServiceNow CMDB (read-only). CLI + watcher script + skill template; no bot polling.
+# Configuration items and relationships (cmdb_ci*, cmdb_rel_ci) for migration wave planning. Separate from any ServiceNow ITSM driver.
+# Nothing site-specific is built in: base URL, account and token are per-instance config
+# (config.yaml -> integrations.<name>: `base_url`, `auth.token` as a ${env:X}/${file:P}/${keychain:S} ref, optional `options.username`).
+# options.username set -> Basic auth (username + password); empty -> Bearer token (OAuth). Only GET /api/now/table is used.
+# Same token convention as the gitlab driver: the CLI resolves the instance from config.yaml via --instance, the token never
+# travels through argv/env/skills. Off unless an instance is configured.
+id: cmdb
+title: ServiceNow CMDB
+type: package
+icon: icon.svg
+auth:
+  types:
+    basic:
+      title: Password of options.username (HTTP Basic)
+      fields:
+        token: { secret: true, required: true }
+    bearer:
+      title: OAuth access token (leave options.username empty)
+      fields:
+        token: { secret: true, required: true }
+settings:
+  base_url: { required: true, example: "https://<instance>.service-now.com" }
+options:
+  username:  { type: string, default: "", pattern: '[A-Za-z0-9._@\-]{0,80}',
+               help: "ServiceNow user for Basic auth; empty = use auth.token as a Bearer token" }
+  app_table: { type: string, default: "cmdb_ci_business_app", pattern: 'cmdb_[a-z0-9_]{2,70}',
+               help: "Table holding business applications (used by app-servers/export/app watcher)" }
+  title:     { type: string, pattern: '[^"`$\\<>]{0,80}', help: "Short label for lists and the skill description (default: the base URL)" }
+cli:
+  entry: cli/cli.py
+  global_args: ["--instance", "${{instance.name}}"]
+env:
+  CMDB_INSTANCE: "${{instance.name}}"
+skill:
+  template: skill/SKILL.md.tmpl
+  name: cmdb
+watchers:
+  cmdb-ci-changed: { script: cmdb_watch.py, args: [changed], emoji: "🗂️", slack_emoji: ":card_index_dividers:", title: "CIs matching a filter that are new or changed" }
+  cmdb-app-members: { script: cmdb_watch.py, args: [app], emoji: "🔗", slack_emoji: ":link:", title: "CIs joining/leaving an application's dependency set (add --app)" }
+kinds:
+  ci:
+    url_match: '^{base_url}/nav_to\.do\?uri=(?:%2F|/)?(?P<table>cmdb_[a-z0-9_]+)\.do%3Fsys_id%3D(?P<sys_id>[0-9a-f]{32})$'
+    card: { fields: [name, class, status, owner], icon: icon.svg, label: '{name}' }
+version: 1

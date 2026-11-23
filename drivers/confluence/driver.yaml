@@ -1,0 +1,44 @@
+# Package driver: Confluence Cloud. CLI + watcher scripts + skill template; no polling in the bot.
+# Nothing site-specific is built in: base URL (the Atlassian site root) and the token are per-instance config
+# (config.yaml -> integrations.<name>: base_url, auth.token as a ${env:VAR}/${file:P}/${keychain:S} ref, options.email).
+# Same token convention as the gitlab driver: the CLI and watcher scripts get only --instance / CONFLUENCE_INSTANCE and
+# resolve the token from config.yaml themselves, so it never travels through argv, env or skills. Off by default.
+id: confluence
+title: Confluence Cloud
+type: package
+icon: confluence
+auth:
+  types:
+    private_token:
+      title: Atlassian API token (account email in options.email)
+      fields:
+        token: { secret: true, required: true }
+settings:
+  base_url: { required: true, example: "https://<site>.atlassian.net" }
+options:
+  email:      { type: string, required: true, pattern: '[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+',
+                help: "Atlassian account email the API token belongs to" }
+  title:      { type: string, pattern: '[^"`$\\<>]{0,80}', help: "Short label for lists and the skill description (default: the email)" }
+cli:
+  entry: cli/cli.py
+  global_args: ["--instance", "${{instance.name}}"]
+env:
+  CONFLUENCE_INSTANCE: "${{instance.name}}"
+skill:
+  template: skill/SKILL.md.tmpl
+  name: confluence
+watchers:
+  confluence-cql:      { script: confluence_watch.py, args: [cql], emoji: "🔎", slack_emoji: ":mag:", title: "New or updated pages/blog posts matching a CQL (add the CQL)" }
+  confluence-space:    { script: confluence_watch.py, args: [space], emoji: "🗂️", slack_emoji: ":card_index_dividers:", title: "New or updated pages in a space (add the space key)" }
+  confluence-mentions: { script: confluence_watch.py, args: [cql, "mention = currentUser() AND type in (page,blogpost)"], emoji: "📣", slack_emoji: ":mega:", title: "Pages that mention me: newly mentioned or updated" }
+  confluence-mine:     { script: confluence_watch.py, args: [cql, "creator = currentUser() AND type in (page,blogpost)"], emoji: "📝", slack_emoji: ":memo:", title: "Pages I created that someone changed" }
+  confluence-page:     { script: confluence_watch.py, args: [page], emoji: "📄", slack_emoji: ":page_facing_up:", title: "One page: new version or new comments (add the page id)" }
+status_sets:
+  page: { current: "📄", draft: "✏️", archived: "🗄️", trashed: "🗑️" }
+kinds:
+  page:
+    status_set: page
+    url_match: '^{base_url}/wiki/spaces/(?P<space>[^/?#]+)/pages/(?P<id>\d+)(?:/[^?#]*)?$'
+    url_template: '{base_url}/wiki/spaces/{space}/pages/{id}'
+    card: { fields: [space, version, updated, author], icon: confluence, label: 'Confluence page' }
+version: 1

@@ -1,0 +1,45 @@
+# Package driver: Microsoft Outlook (mail, calendar, contacts). CLI + watcher scripts + skill template; no polling.
+# Uses the Outlook REST token of a signed-in Teams web tab (read over CDP, like the ms_teams driver), so it needs a
+# Teams tab for the same account in that browser. Per-instance values (config.yaml -> integrations.<name>.options)
+# are injected into the skill, CLI args and watcher env through ${{config.<option>}}. Off by default.
+id: ms_outlook
+title: Microsoft Outlook
+type: package
+icon: outlook
+auth:
+  types:
+    cdp_edge: { title: "Teams web tab in Edge/Chrome via CDP (no secret)", fields: {} }
+options:
+  cdp_url:   { type: string, default: "http://localhost:9222", required: true, pattern: '(?i)https?://[a-z0-9._\-]+(:[0-9]{1,5})?/?',
+               help: "Browser remote-debugging endpoint of the profile signed in to this account (http://host:port)" }
+  account:   { type: string, required: true, pattern: '[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+',
+               help: "Signed-in account (email/UPN) this instance acts as" }
+  tenant_id: { type: string, pattern: '(?i)([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})?',
+               help: "AD tenant GUID; filled by the Test button; used to match Outlook links to this instance" }
+  title:     { type: string, pattern: '[^"`$\\<>]{0,80}', help: "Short label for lists and the skill description (default: the account)" }
+tenant: { option: tenant_id }
+cli:
+  entry: cli/cli.py
+  global_args: ["--cdp-url", "${{config.cdp_url}}", "--account", "${{config.account}}"]
+env:
+  OUTLOOK_CDP_URL: "${{config.cdp_url}}"
+  OUTLOOK_ACCOUNT: "${{config.account}}"
+skill:
+  template: skill/SKILL.md.tmpl
+  name: ms-outlook
+watchers:
+  outlook-new:         { script: outlook_watch.py, args: [mail, --unread, --limit, "20"], emoji: "📧", slack_emoji: ":email:", title: New unread inbox mail }
+  outlook-direct:      { script: outlook_watch.py, args: [mail, --to-me, --exclude-self], emoji: "📨", slack_emoji: ":incoming_envelope:", title: Mail addressed directly to me }
+  outlook-flagged:     { script: outlook_watch.py, args: [mail, --flagged], emoji: "🚩", slack_emoji: ":triangular_flag_on_post:", title: Flagged mail }
+  outlook-attachments: { script: outlook_watch.py, args: [attachments], emoji: "📎", slack_emoji: ":paperclip:", title: Mail with attachments }
+  outlook-event-soon:  { script: outlook_watch.py, args: [event-soon, --hours, "24"], emoji: "📅", slack_emoji: ":date:", title: Event starting soon }
+  outlook-invite:      { script: outlook_watch.py, args: [invite], emoji: "🆕", slack_emoji: ":new:", title: New meeting invite }
+  outlook-event-changed: { script: outlook_watch.py, args: [event-changed], emoji: "🗓️", slack_emoji: ":spiral_calendar_pad:", title: Event moved or cancelled }
+kinds:
+  message:
+    url_match: '^https://outlook\.(?:office|office365|cloud\.microsoft)(?:\.com)?/mail/(?:[^/?#]+/)*?id/(?P<id>[^/?#]+)'
+    card: { fields: [from, time], icon: outlook, label: 'Outlook mail' }
+  event:
+    url_match: '^https://outlook\.(?:office|office365|cloud\.microsoft)(?:\.com)?/calendar/(?:[^/?#]+/)*?(?:item|id)/(?P<id>[^/?#]+)'
+    card: { fields: [start, organizer], icon: outlook, label: 'Outlook event' }
+version: 1

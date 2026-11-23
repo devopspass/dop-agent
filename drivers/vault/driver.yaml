@@ -1,0 +1,36 @@
+# Package driver: HashiCorp Vault — METADATA ONLY (health/seal, auth methods, mounts, policies, KV metadata, token/lease info,
+# audit devices). CLI + watcher script + skill template; no polling by the bot. The CLI hard-refuses endpoints that return
+# secret data (/data/, /creds/, /decrypt/, /sign/, /read, unwrap, sys/raw) and has no writes.
+# Generic: no address built in; each instance sets base_url (the Vault addr) + auth.token as a secret ref
+# (`${env:VAULT_TOKEN}` / `${file:/path}` / `${keychain:svc}`); the CLI/watcher resolve it by instance name, so the token
+# never travels through argv/env/skills. Off unless an instance is configured.
+id: vault
+title: HashiCorp Vault
+type: package
+icon: icon.svg
+auth:
+  types:
+    token:
+      title: "Vault token (secret ref in config; give it a read-only metadata policy)"
+      fields:
+        token: { secret: true, required: true }
+settings:
+  base_url: { required: true, example: "https://vault.example.com:8200" }
+options:
+  namespace:  { type: string, default: "", pattern: '([A-Za-z0-9_.\-]+(/[A-Za-z0-9_.\-]+)*/?)?',
+                help: "Vault Enterprise namespace (X-Vault-Namespace), e.g. team-a/prod; empty = root" }
+  tls_verify: { type: string, default: "true", pattern: '(true|false)', help: "false = skip TLS certificate verification (lab only)" }
+  title:      { type: string, pattern: '[^"`$\\<>]{0,80}', help: "Short label for lists and the skill description (default: the instance name)" }
+cli:
+  entry: cli/cli.py
+  global_args: ["--instance", "${{instance.name}}"]
+env:
+  VAULT_INSTANCE: "${{instance.name}}"
+skill:
+  template: skill/SKILL.md.tmpl
+  name: vault
+watchers:
+  vault-health:       { script: vault_watch.py, args: [health], emoji: "🔐", slack_emoji: ":lock_with_ink_pen:", title: Vault sealed / unhealthy / unreachable (and recovery) }
+  vault-token-expiry: { script: vault_watch.py, args: [token-expiry], emoji: "🔑", slack_emoji: ":key:", title: Instance token nearing expiry (--days D, default 7) }
+  vault-lease-expiry: { script: vault_watch.py, args: [lease-expiry], emoji: "⏳", slack_emoji: ":hourglass_flowing_sand:", title: Leases nearing expiry (needs --prefix, --hours H default 24) }
+version: 1

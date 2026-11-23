@@ -1,0 +1,57 @@
+# Package driver: Jira Service Management (JSM). CLI + watcher scripts + skill template; no bot polling.
+# Covers service-desk requests, queues, SLAs, approvals (service desk REST) and Ops alerts / on-call schedules (JSM Ops REST).
+# Nothing site-specific is built in: base URL, account and token file are per-instance config
+# (config.yaml -> integrations.<name>: `base_url`, `auth.token` as a ${env:X}/${file:P}/${keychain:S} ref, `options.email`).
+# Same token convention as the gitlab driver: the CLI/watchers resolve the instance from config.yaml via --instance, so the
+# token never travels through argv/env/skills. Several instances = several sites.
+# Off unless an instance is configured.
+id: jsm
+title: Jira Service Management
+type: package
+icon: icon.svg
+auth:
+  types:
+    api_token:
+      title: Atlassian API token (account in options.email)
+      fields:
+        token: { secret: true, required: true }
+settings:
+  base_url: { required: true, example: "https://<site>.atlassian.net" }
+options:
+  email:      { type: string, required: true, pattern: '[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+',
+                help: "Atlassian account email the API token belongs to" }
+  cloud_id:   { type: string, default: "auto", pattern: 'auto|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}',
+                help: "Atlassian cloud id for the Ops API (alerts, on-call); `auto` = detected from the site" }
+  title:      { type: string, pattern: '[^"`$\\<>]{0,80}', help: "Short label for lists and the skill description (default: the email)" }
+cli:
+  entry: cli/cli.py
+  global_args: ["--instance", "${{instance.name}}"]
+env:
+  JSM_INSTANCE: "${{instance.name}}"
+skill:
+  template: skill/SKILL.md.tmpl
+  name: jsm
+watchers:
+  jsm-alerts:    { script: jsm_watch.py, args: [alerts], emoji: "🚨", slack_emoji: ":rotating_light:", title: "Ops alerts matching a query: opened / closed" }
+  jsm-queue:     { script: jsm_watch.py, args: [queue], emoji: "📥", slack_emoji: ":inbox_tray:", title: "New issues in a service-desk queue (add --desk and --queue)" }
+  jsm-requests:  { script: jsm_watch.py, args: [requests], emoji: "🎧", slack_emoji: ":headphones:", title: "Requests that are new or changed status" }
+  jsm-approvals: { script: jsm_watch.py, args: [approvals], emoji: "✅", slack_emoji: ":white_check_mark:", title: "Requests waiting for my approval" }
+  jsm-sla:       { script: jsm_watch.py, args: [sla], emoji: "⏱️", slack_emoji: ":stopwatch:", title: "SLA breached or about to breach" }
+  jsm-oncall:    { script: jsm_watch.py, args: [oncall], emoji: "📟", slack_emoji: ":pager:", title: "On-call change in a schedule (add --schedule or --name)" }
+status_sets:
+  request: { open: "📋", "waiting for support": "📋", "in progress": "🔄", "work in progress": "🔄", "waiting for customer": "⏳",
+             pending: "⏳", "waiting for approval": "🕒", escalated: "🔺", resolved: "✅", closed: "✅", done: "✅", canceled: "🚫", cancelled: "🚫" }
+kinds:
+  request:
+    status_set: request
+    # customer-portal link
+    url_match: '^{base_url}/servicedesk/customer/portal/\d+/(?P<key>[A-Z][A-Z0-9]+-\d+)/?$'
+    url_template: '{base_url}/browse/{key}'
+    card: { fields: [key, summary, status, reporter], icon: icon.svg, label: '{key}' }
+  agent_request:
+    status_set: request
+    # agent-view link (queue or issue view)
+    url_match: '^{base_url}/jira/servicedesk/projects/[A-Z][A-Z0-9]+/queues/(?:custom/\d+|issue)/(?P<key>[A-Z][A-Z0-9]+-\d+)/?$'
+    url_template: '{base_url}/browse/{key}'
+    card: { fields: [key, summary, status, reporter], icon: icon.svg, label: '{key}' }
+version: 1

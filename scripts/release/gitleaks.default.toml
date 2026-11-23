@@ -1,0 +1,12 @@
+# Default gitleaks config used by scan_export.sh when the export has no .gitleaks.toml.
+title = "dop-agent default"
+[extend]
+useDefault = true
+[allowlist]
+description = "Test fixtures / placeholders"
+regexes = [
+  '''xoxb-PLANTED[A-Za-z0-9-]*''',
+  '''glpat-abcdefghij[A-Za-z0-9_-]*''',
+  '''AKIAABCDEFGHIJKLMNOP''',
+]
+paths = ['''(^|/)tests/''']

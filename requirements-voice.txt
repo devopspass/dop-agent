@@ -1,0 +1,2 @@
+# Optional: local voice-message transcription (pulls in torch; large).
+openai-whisper==20250625

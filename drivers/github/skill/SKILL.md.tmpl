@@ -1,0 +1,56 @@
+---
+name: ${{skill.name}}
+description: "Use when: ANY GitHub read or action on the ${{config.title}} instance (`${{instance.name}}`, ${{config.base_url}}) — PRs, checks, Actions runs, branches, issues, and watchers. Do not use `gh` command if this skill is enabled."
+---
+
+# ${{skill.name}} — GitHub `${{instance.name}}` (${{config.base_url}})
+
+Always run the CLI with the instance flag (several GitHub hosts may be configured, each has its own skill):
+
+`${{driver.python}} ${{driver.cli}} --instance ${{instance.name}} <command>`
+
+The token is resolved from the integration config; never print or echo it. If the user means another GitHub host, use that instance's skill.
+`<repo>` = full `owner/name`; PR/issue ref = `<repo>#<number>` (a github URL also works). Always explicit — no cwd inference. `<command> -h` shows options.
+
+## Reads
+| Question | Command |
+|---|---|
+| Connection check (config, reach, auth, scopes, GraphQL) / who am I | `test` / `whoami` |
+| PR state, reviews, unresolved threads, checks + failed checks | `pr-status <repo>#<n>` |
+| Review threads (id, file:line, 200 chars) / issue-level comments | `pr-threads <repo>#<n> [--unresolved]` / `pr-comments <repo>#<n> [--limit 20]` |
+| Changed files / checks of a PR | `pr-files <repo>#<n>` / `pr-checks <repo>#<n>` |
+| PR lists | `pr-list [--repo R] [--mine] [--author U] [--reviewer U] [--state open\|closed\|merged\|all] [--since 7d] [--limit 15]` (no filter = my PRs; `me` = token owner) |
+| Workflow runs / workflows | `runs <repo> [--branch B] [--status S] [--event E] [--workflow W] [--limit 15]` / `workflows <repo>` |
+| Run + its jobs (failed steps) / failing log | `run-info <repo> <run_id> [--failed]` / `job-log-tail <repo> <job_id> [--lines 60] [--grep RE]` (ANSI+timestamps stripped, secrets masked) |
+| Actions artifacts / logs / caches / vars | `run-artifacts <repo> [--run ID]`, `run-logs <repo> <run_id> [--out F]` (zip), `artifact-download <repo> <id> [--out F]`, `caches <repo>`, `variables <repo>` (secret names only, never values) |
+| Issues | `issue-status <repo>#<n>`, `issue-list <repo> [--state S] [--label L] [--assignee U] [--author U]` |
+| Repo / user lookup | `repo-info <repo>`, `search-repos <q>`, `org-repos <org> [--search S]`, `users <name...>` |
+| Branches / compare / commits / tags | `branches <repo> [--search S]`, `compare <repo> <base> <head>`, `commits <repo> [--ref R --path F]`, `commit <repo> <sha>`, `tags <repo> [--search S]` |
+| Anything else | `api GET <path> [--fields a,b.c] [--max-chars 3000]`; non-GET needs `--yes` (`--data JSON` / `--data-file F`) |
+
+## Writes (one-line result; ids must be explicit)
+`pr-comment <repo>#<n> (--body T|--body-file F) [--reply REVIEW_COMMENT_ID]`, `thread-resolve <repo>#<n> <thread_id> [--unresolve]`, `pr-review <repo>#<n> --event approve|request-changes|comment [--body T]`, `pr-merge <repo>#<n> [--method merge|squash|rebase] [--delete-branch]`, `pr-create <repo> --head B [--base <default>] --title T [--body-file F] [--draft]`, `run-rerun <repo> <run_id> [--failed]`, `run-cancel`, `workflow-dispatch <repo> <workflow> --ref R [--input K=V]`, `workflow-state <repo> <workflow> enable|disable`, `run-delete <repo> <run_id>`, `run-approve <repo> <run_id>`, `cache-delete <repo> <cache_id>`, `branch-create <repo> <name> --ref R`, `branch-delete`, `tag-create <repo> <name> --ref R [--message M]`, `tag-delete`, `issue-create <repo> --title T [--body-file F] [--label L]`, `issue-comment <repo>#<n> (--body T|--body-file F)`, `issue-close <repo>#<n> [--reason completed|not_planned]`.
+`--reply` takes the `c=<id>` printed by `pr-threads`; `thread-resolve` takes the full thread id printed first by `pr-threads`.
+
+## Rules
+- **Don't explore**: everything is documented here; don't read the CLI source or hunt for script paths.
+- Writes (comment, review, merge, rerun, dispatch, delete, create, close) change shared state: draft the text in chat first and run only after the user asks; name the instance (`${{instance.name}}`) and the target (repo + number).
+- Large diffs/file contents: use the GitHub MCP tools when they are available in the session; otherwise `api GET ... --fields`.
+- Save big outputs (logs) to `/tmp` and grep; don't paste them whole into context.
+
+## Watchers
+Token-free `script` watches (no model turn until something changes) via `watch_script(script="github_watch.py", integration="${{instance.name}}", watcher=<id>)` (scripts live in `${{driver.watch_dir}}`, never invoke them by hand; validate with `dry_run=true`). Exit 0 silent / 200 changed / other = error; the first run is a silent baseline (for `github-run` an already finished run is reported once). Register one after every PR creation/push and wait for it instead of polling.
+
+| watcher id | Fires on | Leading args |
+|---|---|---|
+| `github-review-requested` 👀 | new open PR where my review is requested | `review-requested [--repo R] [--limit N=30]` |
+| `github-assigned` 📌 | new open PR assigned to me | `assigned [--repo R] [--limit N=30]` |
+| `github-my-pr-checks` 🚦 | checks of my open PR turned success/failure | `my-pr-checks [--repo R] [--limit N=30]` |
+| `github-my-pr-notes` 💬 | new comment / review comment / submitted review by others on my open PR | `my-pr-notes [--repo R] [--include-bots] [--max-chars N=200]` |
+| `github-pr` 🔀 | ONE PR: new comments/reviews, checks success/failure, merged/closed | `pr --ref <repo>#<n> [--include-bots]` |
+| `github-run` ⚙️ | ONE workflow run completed | `run --ref <repo>#<run_id>` |
+| `github-branch-runs` 🏃 | each newly completed run of a repo/branch/workflow | `branch-runs --repo R [--branch B] [--workflow FILE_OR_ID] [--limit N=30]` |
+
+The leading mode is added automatically; pass only extra filters in `args`. "Me" is the owner of the instance's token. Scans are bounded (`--limit` PRs/runs, 5 items per stream per PR per run). `github-pr` / `github-run` report when the target is merged/closed/finished: remove the watch then.
+Example: `watch_script(session_id=<id>, script="github_watch.py", watcher="github-pr", integration="${{instance.name}}", args=["--ref", "owner/name#12"], schedule="cron:*/5 * * * *", prompt="PR changed: summarize and act", retries=3)`.
+Say clearly whether you ran a `dry_run` (nothing registered) or registered the watch.

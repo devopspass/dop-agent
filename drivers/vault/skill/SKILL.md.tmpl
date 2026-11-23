@@ -1,0 +1,41 @@
+---
+name: ${{skill.name}}
+description: "Use when: ANY HashiCorp Vault read/action on ${{config.base_url}} (`${{config.title}}`) — seal/health, auth methods, mounts, policies, KV metadata, token/lease expiry, audit devices, and watchers."
+---
+
+# ${{skill.name}} — Vault `${{instance.name}}` (${{config.base_url}})
+
+Run from anywhere (do not explore script paths; use `--help` if needed):
+
+`${{driver.python}} ${{driver.cli}} --instance ${{instance.name}} <command>`
+
+## Hard rules
+- **Metadata only.** NEVER read, print or ask for secret values. The CLI refuses `/data/`, `/creds/`, `/decrypt/`, `/sign/`, `/read`, unwrap, `sys/raw`, cubbyhole and anything not on its metadata allow-list, before sending. If it refuses, tell the user why; never work around it (no curl, no `vault kv get`, no other tools).
+- No writes in this version. Token comes from the integration config; never print, echo or `cat` it.
+- If the user means another Vault, use that instance's skill.
+
+## Commands
+| Need | Command |
+|---|---|
+| Connection check (config, health, token, mounts) | `test` |
+| Active/standby/sealed, version | `health`, `seal-status` |
+| Auth methods / secret engines (type, KV version) | `auth-methods`, `mounts` |
+| ACL policies / policy text | `policies`, `policies <name>` |
+| Secret path names (keys only) | `ls <mount/path> [--limit N=200]` |
+| KV v2 versions, created/updated, custom metadata (no data) | `meta <mount/path>` |
+| Own token policies/ttl/expiry | `whoami` |
+| Does my token have access to a path? (reads nothing) | `caps <path> [<path>...]` |
+| Leases below a prefix | `leases <prefix> [--within H] [--limit N=100]`, `leases --count` |
+| Audit devices | `audit` |
+| Other allow-listed metadata endpoint | `raw GET\|LIST <path>` |
+
+Bound scans: use specific prefixes and `--limit`; lease listing needs `sys/leases` policy (403 = not permitted).
+
+## Watchers (`watch_script`, `watcher=<recipe>`, `integration=${{instance.name}}`; scripts in `${{driver.watch_dir}}`)
+| Recipe | Fires when | Flags |
+|---|---|---|
+| `vault-health` | Vault becomes sealed / uninitialized / unreachable, or recovers | — |
+| `vault-token-expiry` | the instance token expires within N days (once per token) | `--days D` (default 7) |
+| `vault-lease-expiry` | leases under a prefix expire within N hours (each once) | `--prefix P` (required), `--hours H` (default 24), `--limit N` |
+
+First run records a baseline. Always run with `dry_run` first and report clearly whether it was a dry run or a registered watch.

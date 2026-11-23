@@ -1,0 +1,46 @@
+---
+name: ${{skill.name}}
+description: "Use when: ANY Jenkins read or action on the ${{config.title}} instance (`${{instance.name}}`, ${{config.base_url}}) — jobs, builds, console logs, queue and agents, pipeline stages, and watchers."
+---
+
+# ${{skill.name}} — Jenkins `${{instance.name}}` (${{config.base_url}})
+
+Always run the CLI with the instance flag (several Jenkins servers may be configured, each has its own skill):
+
+`${{driver.python}} ${{driver.cli}} --instance ${{instance.name}} <command>`
+
+The API token is resolved from the integration config; never print or echo it. If the user means another Jenkins, use that instance's skill.
+`<job>` = slash path `folder/sub/job` (or a Jenkins URL; `%2F` for a slash inside a multibranch branch name). `<build>` = number or `last|completed|success|failed|stable|unstable` (default `last`). `<command> -h` shows options.
+
+## Reads
+| Question | Command |
+|---|---|
+| Connection check (config, reach, auth) | `test` |
+| List / search jobs under a folder (bounded scan) | `jobs [<folder>] [--search Q] [--failing] [--limit 40]` |
+| Job: health, last/success/failed builds, parameter definitions | `job-info <job>` |
+| Recent builds of a job | `builds <job> [--limit 10]` |
+| One build: status, duration, parameters, causes, changes | `build-info <job> [<build>]` |
+| Console log tail (ANSI stripped, secrets masked) | `log-tail <job> [<build>] [--lines 60] [--grep RE]` |
+| Pipeline stages with status/duration | `stages <job> [<build>]` |
+| Build queue (why waiting, how long) | `queue` |
+| Nodes / agents (online, busy executors, offline reason) | `nodes [--offline]` |
+
+## Writes (confirm first)
+`trigger <job> [--param K=V ...]`, `abort <job> <build>`, `rebuild <job> [<build>]` (same parameters as that build). Without `--yes` they only print a `DRY-RUN` line.
+Flow: show the user instance (`${{instance.name}}`), job, build and parameters in chat → wait for an explicit OK → re-run with `--yes`. Parameters of password type are never readable and are not copied by `rebuild`.
+
+## Rules
+- **Don't explore**: everything is documented here; don't read the CLI source or hunt for script paths.
+- Start with `build-info`/`stages`, then `log-tail --grep 'error|fail|exception'`; save long logs to `/tmp` and grep, don't paste them whole.
+- Large scans are bounded (≤25 listing requests, ≤500 jobs); narrow by folder instead of raising limits.
+
+## Watchers
+Script watchers (token-free: no model turn until something changes) via `watch_script(script="jenkins_watch.py", integration="${{instance.name}}", watcher=<id>)`. Scripts live in `${{driver.watch_dir}}`; never invoke them by hand, validate with `dry_run=true` and say clearly whether a result is a dry run or a registered watch. Exit 0 silent / 200 changed / other = error.
+
+| watcher id | Fires on | Leading args |
+|---|---|---|
+| `jenkins-build` 🏗️ | a build of the job / any job in the folder finished (first run = silent baseline) | `build --target <job-or-folder> [--only-failed] [--limit 100]` |
+| `jenkins-queue-stuck` ⏳ | queue item waiting ≥ N minutes or flagged stuck (reported once per item) | `queue-stuck [--min-minutes 30]` |
+
+The leading mode is added automatically; pass only extra flags in `args`. If several builds of one job finish between runs, the latest one is reported.
+Example: `watch_script(session_id=<id>, script="jenkins_watch.py", watcher="jenkins-build", integration="${{instance.name}}", args=["--target","team/app-deploy","--only-failed"], schedule="cron:*/5 * * * *", prompt="build failed: look at the log and summarize", retries=3)`.

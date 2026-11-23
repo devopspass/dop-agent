@@ -1,0 +1,3 @@
+# Screenshots
+
+The `webui-*.png` images are generated from a throwaway, fully fictional demo workspace (fake sessions, tickets and people; nothing from a real install). To regenerate them: `python -m venv /tmp/demo-venv && /tmp/demo-venv/bin/pip install -r requirements.txt playwright pillow && /tmp/demo-venv/bin/playwright install chromium`, then run `/tmp/demo-venv/bin/python scripts/demo/take_screenshots.py` from `dop-agent/`. `scripts/demo/seed_demo.py` can also be run on its own to browse the demo Web UI by hand (it redirects `HOME` and the config to a temp dir, so your real data is never touched).

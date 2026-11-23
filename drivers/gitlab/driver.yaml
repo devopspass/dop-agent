@@ -1,0 +1,49 @@
+# Package driver: GitLab. CLI + watcher scripts + skill template; no polling inside the bot.
+# Generic: no host is built in; every instance sets its own base_url + token (config.yaml -> integrations.<name>),
+# several instances = several hosts. The CLI/watcher scripts resolve the instance (base_url, token ref) from
+# config.yaml via --instance, so tokens never travel through argv/env/skills. Off unless an instance is configured.
+id: gitlab
+title: GitLab
+type: package
+icon: gitlab
+auth:
+  types:
+    private_token:
+      title: Personal/project access token (api scope)
+      fields:
+        token: { secret: true, required: true }
+settings:
+  base_url: { required: true, example: https://gitlab.example.com }
+options:                                        # driver-specific per-instance options
+  title: { type: string, pattern: '[^"`$\\<>]{0,80}', help: "Short label for lists and the skill description (default: the instance name)" }
+cli:
+  entry: cli/cli.py
+  global_args: ["--instance", "${{instance.name}}"]
+env:
+  GITLAB_INSTANCE: "${{instance.name}}"
+skill:
+  template: skill/SKILL.md.tmpl
+  name: gitlab
+watchers:                                       # script watches (token-free); pass --target for mr/pipeline/job
+  gitlab-review-requested: { script: gitlab_watch.py, args: [review-requested], emoji: "👀", slack_emoji: ":eyes:", title: MRs where my review is requested }
+  gitlab-assigned:         { script: gitlab_watch.py, args: [assigned], emoji: "📌", slack_emoji: ":pushpin:", title: MRs assigned to me }
+  gitlab-my-mr-pipelines:  { script: gitlab_watch.py, args: [my-mr-pipelines], emoji: "🚦", slack_emoji: ":vertical_traffic_light:", title: Pipeline finished on my open MRs }
+  gitlab-my-mr-notes:      { script: gitlab_watch.py, args: [my-mr-notes], emoji: "💬", slack_emoji: ":speech_balloon:", title: New comments on my open MRs }
+  gitlab-mr:               { script: gitlab_watch.py, args: [mr], emoji: "🔀", slack_emoji: ":twisted_rightwards_arrows:", title: One MR (notes, pipeline result, merged/closed) }
+  gitlab-pipeline:         { script: gitlab_watch.py, args: [pipeline], emoji: "🚦", slack_emoji: ":vertical_traffic_light:", title: One pipeline (or latest of a branch) result }
+  gitlab-job:              { script: gitlab_watch.py, args: [job], emoji: "⚙️", slack_emoji: ":gear:", title: One job result }
+kinds:
+  merge_request:
+    # {base_url} is substituted (regex-escaped) from the instance; named groups are the resource identity.
+    url_match: '^{base_url}/(?P<project>.+)/-/merge_requests/(?P<id>\d+)/?$'
+    url_template: '{base_url}/{project}/-/merge_requests/{id}'
+    card: { fields: [title, state, pipeline, approvals, author], icon: gitlab, label: '!{id}' }
+  pipeline:
+    url_match: '^{base_url}/(?P<project>.+)/-/pipelines/(?P<id>\d+)/?$'
+    url_template: '{base_url}/{project}/-/pipelines/{id}'
+    card: { fields: [status, ref, project, duration], icon: gitlab, label: 'Pipeline #{id}' }
+  job:
+    url_match: '^{base_url}/(?P<project>.+)/-/jobs/(?P<id>\d+)/?$'
+    url_template: '{base_url}/{project}/-/jobs/{id}'
+    card: { fields: [name, stage, status, project], icon: gitlab, label: 'Job #{id}' }
+version: 1

@@ -1,0 +1,58 @@
+---
+name: ${{skill.name}}
+description: "Use when: ANY JFrog Artifactory task on `${{instance.name}}` (${{config.base_url}}, ${{config.title}}) — artifacts, packages, AQL, upload, and watchers."
+---
+
+# ${{skill.name}} — Artifactory `${{instance.name}}` (${{config.base_url}})
+
+Always run the CLI with the instance flag (several Artifactory servers may be configured, each has its own skill):
+
+`${{driver.python}} ${{driver.cli}} --instance ${{instance.name}} <command>`
+
+Credentials come from the integration config; never print or echo a token, never `cat` state files. If the user means another Artifactory server, use that instance's skill. Paths are always `repo/dir/file` (no URL, no `..`).
+
+## Commands
+| Need | Command |
+|---|---|
+| Connection check (config, reach, read, token, upload config) | `test` |
+| Repositories | `repos [--type local\|remote\|virtual]` |
+| Folder listing | `ls <repo/path> [-l]` (`-l` = size + modified) |
+| Size, sha256, created/modifiedBy of a file | `info <repo/path>` |
+| Find by name | `search '<glob>' [--repo R] [--limit N=100]` e.g. `'*.tgz'` |
+| AQL (needs a token) | `aql 'items.find({"repo":"r","name":{"$match":"x-*"}}).include("repo","path","name")'` (include repo, path, name) |
+| Download | `get <repo/path> [-o FILE] [--force]` |
+| Compare local file with the server | `verify <local-file> <repo/path>` (exit 1 on mismatch) |
+| Any other REST call | `raw GET <api/path>`; non-GET only with `--yes` (dry-run otherwise) |
+| Token (when the instance has one) | `token status`; `token authorize` (auth.type sso_token only); `token revoke <id>` |
+| Upload | `upload <file> <repo/path/> [--name N] [--force] [--timeout S]`, add `--yes` to really send |
+
+Naming convention seen on many servers (verify with `repos`): `l-`/`local-` local, `r-`/`remote-` remote proxy, `v-`/`virtual-` virtual; check a remote proxy first - if it can proxy the artifact, no upload is needed. Prefer production repos for pulls.
+
+## Access model
+- Anonymous read (ping, `ls`, `info`, `search`, `repos`, download) works only if the server allows it; AQL, token introspection and writes usually need a token. HTTP 401/403 on a read means the instance needs `auth.type: access_token` (or `sso_token`); tell the user, don't retry.
+- Writes need write permission on the target repo.
+- `sso_token` tokens have a fixed lifetime and are not refreshable: `token status` shows the days left; `token authorize` drives the browser at `${{config.cdp_url}}` (needs a signed-in SSO session, `websocket-client`) and revokes the previous token.
+
+## Uploading (write action - confirm first)
+1. Pick the final name first: `ls -l <repo/path>` and read any `read.txt`/`readme.txt`; a new build of an existing name should get a new versioned name (`--name`). Uploading an existing name silently overwrites on many setups; the CLI refuses unless `--force`.
+2. Run `upload` without `--yes` (plan only), show target repo/path, name, size and whether it overwrites; ask the user to confirm.
+3. Re-run with `--yes`. The CLI does a PUT with a checksum header and verifies sha256.
+4. `verify <file> <repo/path>` re-checks the checksum any time.
+
+## Rules
+- **Don't explore.** Everything is documented here: no `--help`, no `ls`/`find` for scripts, no reading watcher source. Watcher scripts (in `${{driver.watch_dir}}`) run only through `watch_script`; to validate a watch use `dry_run=true` and report clearly whether it was only a dry run or really registered.
+- Bound scans: use `ls`, `search --repo`, narrow AQL (`.limit(50)`) instead of listing whole repos. Save big outputs to `/tmp` and grep.
+- Never run non-GET `raw` or `upload --yes` without explicit user approval of the exact target.
+
+## Watchers (wake the session on change; do not poll Artifactory yourself)
+Use `watch_script` with `script="artifactory_watch.py"`, `integration="${{instance.name}}"` (pins this server) and `watcher=<id>`. Read-only; exit 0 silent / 200 changed / other = error; the first run is a silent baseline. Schedule e.g. `cron:*/15 * * * *`, `retries=3`.
+
+| watcher id | Fires on | Leading args / extra |
+|---|---|---|
+| `artifactory-new-files` 📦 | new files below a folder | `files --new-only` + `--path REPO/DIR [--name GLOB]... [--depth N=1] [--limit N=10]` |
+| `artifactory-file-changes` ♻️ | new or overwritten files (sha1/size/modified change) | `files` + same flags |
+| `artifactory-token-expiry` 🔑 | token expires within the window (once per token) | `token-expiry [--days D=30]` (daily cron) |
+| `artifactory-health` 🩺 | server stops/resumes answering ping | `health` |
+
+The leading mode of the chosen watcher is added automatically; pass only the extra flags in `args`.
+Example: `watch_script(session_id=<id>, script="artifactory_watch.py", watcher="artifactory-file-changes", integration="${{instance.name}}", args=["--path","some-repo/dir","--name","*.zip"], schedule="cron:*/15 * * * *", prompt="a file changed: report name, size and who may have uploaded it", retries=3)`.

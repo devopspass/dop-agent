@@ -1,0 +1,42 @@
+---
+name: ${{skill.name}}
+description: "Use when: ANY Splunk read/action on ${{config.base_url}} (`${{config.title}}`) — SPL searches, saved searches/reports, fired alerts, indexes/sourcetypes, search jobs, and watchers."
+---
+
+# ${{skill.name}} — Splunk `${{instance.name}}` (${{config.base_url}})
+
+Always run the CLI with the instance flag (several Splunk servers may be configured, each has its own skill):
+
+`${{driver.python}} ${{driver.cli}} --instance ${{instance.name}} <command>`
+
+Read-only. The token comes from the integration config; never print or echo it. Output is a compact tab-separated table (`--json` for JSON, `--width N` per cell, `--max-chars N` default 6000, 0 = unlimited). The instance may define a default app and default index (applied automatically) and caps rows per search at `${{config.max_results}}`.
+
+## Commands
+| Need | Command |
+|---|---|
+| Connection check (config, auth, user/roles) | `test` |
+| Run SPL (async job) | `search 'SPL' [--earliest -15m] [--latest now] [--count 20] [--timeout 60] [--fields a,b]` |
+| Job status / results / cancel / recent jobs | `job status SID`, `job results SID [--count --offset]`, `job cancel SID`, `job list [--limit 20]` |
+| Saved searches / reports | `saved list [--filter TEXT] [--limit 30]`, `saved get NAME`, `saved history NAME [--limit 30]` |
+| Fired alerts | `alerts [--limit 30]` (per alert, with count), `alerts NAME` (its fired instances) |
+| Indexes | `indexes [--filter TEXT] [--limit 50]` |
+| Sourcetypes | `sourcetypes [--index I] [--earliest -24h] [--limit 50]` |
+
+SPL tips: a leading `search ` and the default index are added automatically; use `| stats count by host`, `| table f1 f2`, `| head N` to keep results small. A search that is not done within `--timeout` is cancelled and reported; narrow the window/filters instead of raising limits. Commands that write or execute (`delete`, `outputlookup`, `collect`, `sendemail`, `script`, `run`, ...) are refused by the CLI; don't try to work around it.
+
+## Rules
+- **Don't explore**: everything is documented here; don't read the CLI source or hunt for script paths (use `-h` if a flag is unclear).
+- Always bound searches: short `--earliest` window, a specific `index=`/`sourcetype=`, aggregate (`stats`/`table`/`head`) instead of raw events. Save big outputs to `/tmp` and grep.
+- Raw events can contain secrets/PII; show only what the user needs.
+- If this token lacks access to an index/app the user's own login has, say so; don't hunt for other credentials.
+
+## Watchers
+Token-free script watches (no model turn until something changes): `watch_script(script="splunk_watch.py", integration="${{instance.name}}", watcher=<id>)`. Scripts live in `${{driver.watch_dir}}`, never invoke them by hand; validate with `dry_run=true` and report clearly whether it was only a dry run or really registered. Exit 0 silent / 200 changed / other = error; the first run is a silent baseline.
+
+| watcher id | Fires on | Leading args |
+|---|---|---|
+| `splunk-alert-fired` 🚨 | saved-search alert fired (new fired instance) | `fired [--alert SUBSTR ...] [--limit 50] [--max-alerts 100]` |
+| `splunk-search-results` 🔎 | rows of a bounded SPL query not seen before | `results --spl 'SPL' [--earliest -15m] [--latest now] [--count 20] [--timeout 60] [--key FIELD ...]` |
+
+The leading mode is added automatically; pass only the filters in `args`. `results` needs `--spl` (read-only SPL, keep it narrow and cheap; use `--key` for the fields that identify a row so changed counters do not re-fire). Schedule at most every 5 minutes.
+Example: `watch_script(session_id=<id>, script="splunk_watch.py", watcher="splunk-search-results", integration="${{instance.name}}", args=["--spl","index=app level=ERROR | head 20","--earliest","-15m"], schedule="cron:*/5 * * * *", prompt="new ERROR events: summarize", retries=3)`.

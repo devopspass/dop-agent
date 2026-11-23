@@ -1,0 +1,46 @@
+---
+name: ${{skill.name}}
+description: "Use when: ANY ServiceNow read or action on ${{config.base_url}} (${{config.title}}) — incidents, changes, requests/RITMs, tasks, assignment groups, and watchers."
+---
+
+# ${{skill.name}} — ServiceNow at ${{config.base_url}} (${{config.title}})
+
+Integration instance: `${{instance.name}}`. Always run the CLI with `--instance` (it resolves base URL, account and token from config; never print or echo the token):
+
+`${{driver.python}} ${{driver.cli}} --instance ${{instance.name}} <command>`
+
+NUMBER = ticket number: INC (incident), CHG (change), RITM (requested item), REQ (request), SCTASK / CTASK / TASK, PRB (problem). If the user means another ServiceNow instance, use that instance's own skill. CMDB (configuration items) is not covered here.
+
+## Commands
+| Need | Command |
+|---|---|
+| Lists (one line each: number, state, priority, assignee, group, updated, summary) | `incidents`, `changes`, `requests`, `ritms`, `tasks`, `list --table T` with `[--mine] [--opened-by-me] [--group NAME\|SYS_ID] [--state LABEL\|VALUE] [--all] [--days N] [--query ENCODED] [--limit 20]` (default active only; `--all` includes closed) |
+| Change schedule / cutover windows | `cutover [--days 14] [--group G]` (planned start within N days); `ticket CHG…` shows start/end, risk, approval, plans |
+| One ticket (+ last N comments and work notes) | `ticket NUMBER [--comments 3]`; `comments NUMBER [--limit 10] [--kind all\|comments\|work_notes]` |
+| Approvals / attachments (names and sizes only) | `approvals NUMBER`; `attachments NUMBER` |
+| Assignment groups | `groups [--search TEXT] [--limit 20]` |
+| Generic read-only table query | `query TABLE --query 'active=true^priority=1' [--fields a,b] [--limit 20] [--order -sys_updated_on]` (encoded query; no scripts) |
+| Comment / work note | `comment NUMBER "text"` or `--file f`; `--work-note` = internal note; add `--confirm` to send |
+| State transition | `transition NUMBER "Resolved" [--note TEXT] [--confirm]` (label or numeric value; business rules may reject) |
+| Create | `create-incident --short S [--desc D] [--caller USER] [--group G] [--urgency 1-3] [--impact 1-3]`; `create-change --short S [--type normal\|standard\|emergency] [--desc D] [--group G] [--start 'YYYY-MM-DD HH:MM:SS'] [--end ...]`; add `--confirm` to create |
+| Check the connection | `test` |
+
+Times are UTC as stored by ServiceNow unless the instance converts them for the user; say so when quoting schedule windows.
+
+## Rules
+- **Don't explore**: every command and watcher flag is documented here; never run `--help`, `ls`/`find` for scripts, or read watcher source. Watcher scripts only run through `watch_script` (they live in `${{driver.watch_dir}}`).
+- **Writes are real actions on ${{config.base_url}}**: `comment`, `transition`, `create-*` print a DRAFT and change nothing until `--confirm`. Show the draft (ticket number, target state/text, visibility) to the user, run with `--confirm` only after the user explicitly agrees. A plain comment is visible to the requester: default to `--work-note` unless told otherwise. Approvals cannot be granted/rejected from this skill.
+- Report tickets as links `[NUMBER](${{config.base_url}}/<table>.do?sys_id=…)` (the CLI prints the link); table names: incident, change_request, sc_req_item, sc_request, sc_task, change_task, task, problem.
+- Bound scans: `--limit`, `--group`, `--days`, `--query`; save big outputs to `/tmp` and summarize instead of pasting them whole.
+
+## Watchers (wake the session on change; do not poll ServiceNow yourself)
+Use `watch_script` with `script="snow_watch.py"`, `integration="${{instance.name}}"` (injects this instance) and `watcher=<id>` (picks the icon). Read-only: exit 0 silent / 200 changed / other = error; the first run is a silent baseline. Schedule e.g. `cron:*/5 * * * *`, `retries=3`. The leading args of the chosen watcher are added automatically; pass only the extra flags.
+
+| watcher id | Fires on | Extra flags |
+|---|---|---|
+| `snow-mine` 🎫 | tickets assigned to / opened by me updated (state, assignee, comments, work notes) | `--scope assigned\|opened\|both` (default both), `--tables incident,change_request,sc_req_item,sc_task,change_task`, `--limit 50` |
+| `snow-change` 🔀 | active changes whose state or approval changed, new, or no longer active | `--group G` or `--mine`, `--query ENCODED`, `--limit 100` |
+| `snow-group` 📥 | new tickets created in an assignment group | `--group NAME\|SYS_ID` (required), `--tables incident,sc_task,sc_req_item`, `--limit 50` |
+
+Example: `watch_script(session_id=<id>, script="snow_watch.py", watcher="snow-group", integration="${{instance.name}}", args=["--group", "Service Desk"], schedule="cron:*/5 * * * *", prompt="triage new tickets", retries=3)`.
+To validate a watch use `watch_script(..., dry_run=true)` and report clearly whether it was only a dry run or really registered.

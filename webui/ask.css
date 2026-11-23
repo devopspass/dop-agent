@@ -1,0 +1,30 @@
+.ask-block{margin:8px 0}
+.ask-block-title{font-size:12px;color:var(--slack-text-secondary);margin-bottom:4px}
+.ask-chips{display:flex;flex-direction:column;gap:4px;align-items:flex-start}
+.ask-chip{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--slack-border);border-radius:14px;padding:3px 11px 3px 4px;background:var(--slack-bubble-assistant-bg);color:var(--slack-text-primary);font:inherit;font-size:12.5px;cursor:pointer;text-align:left}
+.ask-chip:hover{border-color:var(--cb-777,#777)}.ask-chip.active{border-color:var(--slack-link)}
+.ask-chip.st-ok{border-color:#2d5a4a;background:var(--cb-1d2a27,#1d2a27)}.ask-chip.st-skip{opacity:.6}
+.ask-badge{display:inline-flex;align-items:center;justify-content:center;min-width:26px;padding:1px 7px;border-radius:6px;font-weight:600;font-size:12px;background:var(--cb-3a3f4a,#3a3f4a);color:var(--slack-text-primary)}
+.ask-badge.done{background:#2d5a4a;color:#e6f4ee}
+.ask-pop{position:fixed;left:0;top:0;z-index:50;background:var(--cb-212428,#212428);border:1px solid var(--cb-4a4f57,#4a4f57);border-radius:10px;padding:10px 12px;box-shadow:0 10px 30px #000a;max-height:70vh;overflow:auto;font-size:14px;color:var(--slack-text-primary)}
+.ask-ph{display:flex;align-items:center;gap:10px;margin-bottom:8px}
+.ask-seg{display:inline-flex;background:var(--cb-15181c,#15181c);border:1px solid var(--slack-border);border-radius:7px;overflow:hidden}
+.ask-seg button{background:none;border:none;color:var(--slack-text-secondary);padding:3px 11px;font-size:12px;cursor:pointer}.ask-seg button.on{background:var(--cb-2f3540,#2f3540);color:var(--ct-fff,#fff)}
+.ask-x{background:none;border:none;color:var(--slack-text-secondary);cursor:pointer;font-size:13px}.ask-x:hover{color:var(--ct-fff,#fff)}
+.ask-muted{color:var(--slack-text-secondary);font-size:12px}.ask-sp{flex:1}.ask-right{margin-left:auto}.ask-empty{padding:12px 4px}
+.ask-ct{display:flex;align-items:center;gap:8px;margin-bottom:6px}
+.ask-opt{display:flex;gap:10px;align-items:center;padding:5px 9px;margin:3px 0;border:1px solid var(--slack-border);border-radius:8px;cursor:pointer;background:var(--cb-1e2125,#1e2125);font-size:13px}
+.ask-opt:hover{border-color:var(--cb-5a6068,#5a6068);background:var(--cb-262a30,#262a30)}.ask-opt.sel{background:#1e2c33;border-color:#3d6a80}
+.ask-opt kbd{flex:none;min-width:20px;text-align:center;color:var(--slack-text-secondary);background:var(--cb-2b2d31,#2b2d31);border:1px solid var(--cb-444,#444);border-radius:4px;font-size:11px}
+.ask-lbl{font-weight:500}.ask-rec{font-size:10.5px;text-transform:uppercase;letter-spacing:.04em;color:var(--ct-9a958a,#9a958a);border:1px solid var(--cb-444,#444);border-radius:4px;padding:0 4px;margin-left:6px}
+.ask-onote{display:block;color:var(--slack-text-secondary);font-size:12.5px}
+.ask-note{width:100%;margin-top:6px;background:var(--cb-15181c,#15181c);border:1px solid var(--slack-border);border-radius:6px;color:var(--ct-fff,#fff);padding:7px 9px;font:inherit;font-size:13px;resize:vertical;box-sizing:border-box}
+.ask-note:focus{outline:none;border-color:var(--slack-link)}
+.ask-pf{display:flex;gap:8px;align-items:center;margin-top:8px}
+.ask-btn{background:var(--cb-2b2d31,#2b2d31);border:1px solid var(--slack-border);color:var(--slack-text-primary);border-radius:6px;padding:2px 10px;font:inherit;font-size:12px;cursor:pointer;height:26px}
+.ask-btn:hover{background:var(--cb-35373b,#35373b)}.ask-btn.primary{background:var(--slack-accent);border-color:var(--slack-accent);color:#fff}.ask-btn[disabled]{opacity:.4;cursor:default}
+.ask-tbl{display:flex;flex-direction:column;gap:3px}
+.ask-row{display:flex;gap:10px;align-items:center;padding:6px 10px;border-radius:6px;border-left:3px solid transparent;background:var(--cb-1b1e22,#1b1e22);cursor:pointer}
+.ask-row:hover{background:var(--cb-23272d,#23272d)}.ask-tt{flex:1;min-width:0}.ask-ta{color:var(--slack-text-secondary);font-size:12.5px;max-width:45%;text-align:right}
+.ask-row.st-ok{background:var(--cb-1d2a27,#1d2a27);border-left-color:#3f8a6c}.ask-row.st-ok .ask-ta{color:var(--ct-bfe3d3,#bfe3d3)}
+.ask-row.st-skip{background:var(--cb-222427,#222427);border-left-color:var(--cb-6b6f76,#6b6f76)}.ask-row.st-skip .ask-tt{color:var(--slack-text-secondary)}

@@ -1,0 +1,136 @@
+# DOP Agent configuration (example). Real file: ~/.dop-agent/config.yaml (chmod 600).
+# Secrets are never inline: use "${env:NAME}", "${file:~/path}" (must be chmod 600) or "${keychain:service}".
+# Precedence: env var > this file > built-in default.
+# "General per-driver" knowledge (URL regexes, status sets, watch types, auth schema)
+# lives in dop-agent/drivers/<driver>/driver.yaml, NOT here. This file only holds
+# agent-wide settings and per-INSTANCE integration settings/overrides.
+version: 1
+
+agent:
+  workdir: ~                              # COPILOT_WORKDIR (default: $HOME)
+  session_timeout_s: 120                  # SESSION_TIMEOUT
+  startup_notify_channel: ""              # STARTUP_NOTIFY_CHANNEL
+  copilot:
+    github_token: "${env:COPILOT_GITHUB_TOKEN}"   # Copilot SDK auth
+  model_routing:                          # MODEL_ROUTING / _CHEAP / _DEFAULT
+    mode: on                              # on | dry | off
+    cheap_model: claude-haiku-5.5
+    default_model: ""
+  new_session_platform: ""                # NEW_SESSION_PLATFORM
+  usage_widget: on                        # USAGE_WIDGET
+  quota_ttl_s: null                       # QUOTA_TTL_SECONDS (null = built-in)
+  table_render_mode: image                # TABLE_RENDER_MODE: image | ascii
+  transcription:
+    whisper_model: large                  # WHISPER_MODEL
+    audio_auto_send: true                 # AUDIO_AUTO_SEND
+    audio_max_bytes: 2147483648           # AUDIO_MAX_BYTES
+    audio_retention_days: 7               # AUDIO_RETENTION_DAYS
+
+adapters:                                 # ways to talk to the agent (adapters.py)
+  web:
+    host: 127.0.0.1                       # WEB_UI_HOST
+    port: 10818                           # WEB_UI_PORT
+    public_host: localhost                # WEB_UI_PUBLIC_HOST
+    allowed_hosts: []                     # WEB_UI_ALLOWED_HOSTS
+    frontend_enabled: true                # WEB_UI_FRONTEND_ENABLED
+    password: "${env:WEB_UI_PASSWORD}"
+    secret_key: "${env:WEB_UI_SECRET_KEY}"
+  slack:
+    enabled: true
+    bot_token: "${env:SLACK_BOT_TOKEN}"
+    app_token: "${env:SLACK_APP_TOKEN}"
+    allowed_user_id: ""                   # ALLOWED_USER_ID
+  telegram:
+    enabled: false
+    bot_token: "${file:~/.dop-agent/secrets/telegram_bot_token}"   # TELEGRAM_BOT_TOKEN[_FILE]
+    allowed_user_ids: []                  # TELEGRAM_ALLOWED_USER_IDS
+    forum_chat_id: null                   # TELEGRAM_FORUM_CHAT_ID
+    max_update_age_s: 600                 # TELEGRAM_MAX_UPDATE_AGE
+
+mcp:
+  auth_token: "${env:MCP_AUTH_TOKEN}"       # MCP_AUTH_TOKEN for the in-process /mcp server
+
+watchers:                                 # engine-level (per-kind intervals come from integrations)
+  tick_s: 60                              # WATCHER_POLL_INTERVAL
+  fetch_timeout_s: 45                     # WATCH_POLL_TIMEOUT
+  session_turn: { stale_after_days: 7, default_max_chain: 10 }
+  coalesce_window_s: 6
+  builtin_types: [time, self_restart, session_turn, script]   # integration-less watch types
+
+unfurl:                                   # link-hover cards (engine-level)
+  cache_ttl_s: 60
+
+integrations:                             # instances; each picks a driver from the catalog
+  # Jira Cloud: package driver (CLI + watcher scripts + skill "jira-<instance>") that also keeps the bot-polled
+  # `ticket` watch. No site is built in; add one instance per Jira site/account.
+  jira-main:                              # instance name (free text, unique)
+    driver: jira                          # -> dop-agent/drivers/jira/
+    enabled: true
+    base_url: https://yourorg.atlassian.net
+    auth: { type: token_file }            # the API token lives in a file, never in this config
+    options:                              # driver-defined options (see driver.yaml `options`)
+      email: me@example.com               # Atlassian account the token belongs to
+      token_file: ~/.dop-agent/secrets/jira-token   # chmod 600
+      # sp_field: customfield_10016       # story points / sprint field ids; empty = auto-detect
+      # sprint_field: customfield_10020
+      # title: Main Jira                  # optional label for the skill
+    kinds:                                # optional per-instance overrides of driver kinds
+      ticket:
+        enabled: true
+        watch: { poll_interval_s: 300 }
+
+  # Confluence Cloud: package driver (CLI + watcher scripts + skill "confluence-<instance>"). Token convention as the
+  # gitlab driver: auth.token is an env/file/keychain ref resolved by the CLI itself.
+  confluence-main:
+    driver: confluence
+    enabled: false
+    base_url: https://yourorg.atlassian.net   # site root, "/wiki" is added by the driver
+    auth: { type: private_token, token: "${env:CONFLUENCE_TOKEN}" }
+    options:
+      email: me@example.com
+      # title: Main Confluence
+
+  # Jira Service Management: package driver (requests, queues, SLAs, approvals, Ops alerts/on-call; skill
+  # "jsm-<instance>"). Token convention as in gitlab: env/file/keychain ref, resolved by the CLI; several instances = several sites.
+  jsm-main:
+    driver: jsm
+    enabled: false
+    base_url: https://yourorg.atlassian.net
+    auth: { type: api_token, token: "${env:JSM_TOKEN}" }   # Atlassian API token; env/file/keychain ref
+    options:
+      email: me@example.com                       # account the token belongs to
+      # cloud_id: auto                              # Ops API cloud id; auto = detected from the site
+      # title: Main JSM
+
+  # GitLab: package driver (CLI + watcher scripts + skill "gitlab-<instance>"). No host is built in; add one
+  # instance per GitLab host/token.
+  gitlab-main:
+    driver: gitlab
+    enabled: true
+    base_url: https://gitlab.example.com
+    auth: { type: private_token, token: "${env:GITLAB_TOKEN}" }   # api-scope token; env/file/keychain ref
+    options:                              # driver-defined options (see driver.yaml `options`)
+      # title: Main GitLab                # optional label for the skill
+
+  # GitHub: package driver (CLI + watcher scripts + skill "github-<instance>"). No host is built in; add one
+  # instance per GitHub host/token (github.com and/or GitHub Enterprise).
+  github-main:
+    driver: github
+    enabled: true
+    base_url: https://github.com          # the WEB url; API endpoints are derived from it
+    auth: { type: private_token, token: "${env:GITHUB_TOKEN}" }   # classic scopes repo+workflow; env/file/keychain ref
+    options:
+      # api_url: https://ghe-api.example.com   # only when the API is not at <base_url>/api/v3
+      # title: Main GitHub                      # optional label for the skill
+
+  # Package driver (CLI + watcher scripts + skill). Off by default; an enabled instance adds its own skill
+  # ("ms-teams-<instance>") to new sessions. Several instances = several accounts/tenants.
+  teams-main:
+    driver: ms_teams
+    enabled: false
+    auth: { type: cdp_edge }
+    options:
+      cdp_url: http://localhost:9222        # browser profile signed in to this account
+      account: me@example.com
+      title: AWS tenant                     # optional label (default: the account)
+      # tenant_id: filled by Settings -> Test; matches Teams links to this instance

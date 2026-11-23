@@ -1,0 +1,47 @@
+---
+name: ${{skill.name}}
+description: "Use when: ANY Power BI / Fabric read or action for ${{config.account}} (${{config.title}}) — workspaces, reports, dashboards, datasets, refreshes, DAX queries, owners/permissions, and watchers."
+---
+
+# ${{skill.name}} — Power BI as ${{config.account}} (${{config.title}})
+
+Integration instance: `${{instance.name}}`. Always run the CLI with the instance flags:
+
+`${{driver.python}} ${{driver.cli}} --cdp-url ${{config.cdp_url}} --account ${{config.account}} [--json] <command>`
+
+Tokens are never printed; never echo them. If the user names another account/tenant, use that account's own skill.
+
+## Commands
+| Need | Command |
+|---|---|
+| Identity / tenant | `whoami` |
+| Workspaces | `workspaces [--name S] [--top N=50]` |
+| Reports / dashboards / datasets | `reports\|dashboards\|datasets [--workspace GUID\|me] [--name S] [--top N=50]` (datasets show owner = configuredBy) |
+| Refresh history/status (newest first) | `refresh-history DATASET_GUID [--workspace W] [--top N=10]` (status Completed/Failed/Unknown=running; error code on failures) |
+| Trigger refresh | `refresh DATASET_GUID [--workspace W]` = dry run; add `--yes` to really trigger |
+| DAX query | `dax DATASET_GUID --query 'EVALUATE TOPN(10, Sales)' [--workspace W] [--max-rows N=50 (cap 500)] [--max-cell N=80]` (or `--query-file F\|-`) |
+| Owners / permissions (read) | `access workspace\|dataset\|dashboard\|report GUID [--workspace W] [--top N=50]` |
+| Check the connection (CDP, tab, token, API) | `test` |
+
+`--workspace` defaults to `me` (My workspace); get workspace GUIDs from `workspaces`. IDs must be GUIDs (URLs: `app.powerbi.com/groups/<workspace>/reports|datasets|dashboards/<id>`). Report-level ACLs need the admin API, so `access report` shows the dataset owner and workspace members.
+
+## Requirements
+- Browser with remote debugging at `${{config.cdp_url}}` and a signed-in **Power BI/Fabric** tab (`app.powerbi.com` or `app.fabric.microsoft.com`) for `${{config.account}}`: the Power BI token is read from that tab's MSAL cache via CDP; no app registration. Needs `pip install websocket-client`; reuses the `ms_teams` driver's auth helper.
+- On "No unexpired token"/"not signed in" ask the user to open/refresh that tab. Run `test` to diagnose.
+
+## Rules
+- **Don't explore, everything is documented here.** No `--help`, `ls`/`find` for scripts, no reading watcher source; watcher scripts (in `${{driver.watch_dir}}`) run only through `watch_script`. For validation use `watch_script(..., dry_run=true)` and say clearly whether it was only a dry run or really registered.
+- **Refresh is a real action** on a production dataset: name the dataset, workspace and account, show the dry run, and use `--yes` only after explicit user approval. Do not retry blindly (API limit 8 refreshes/day on shared capacity).
+- **DAX is read-only but can be heavy.** Use `TOPN`/filters, keep `--max-rows` small, summarise instead of pasting big tables; save large output to `/tmp`.
+- Bound scans: use `--name`, `--top`; never list everything.
+
+## Watchers (wake the session on change; do not poll yourself)
+Use `watch_script` with `script="powerbi_watch.py"`, `integration="${{instance.name}}"` and `watcher=<id>`. Read-only and token-free: exit 0 silent / 200 changed / other = error; the first run is a silent baseline (past failures not reported); each finished refresh fires once. Schedule e.g. `cron:*/10 * * * *`, `retries=3`.
+
+| watcher id | Fires on | Leading args |
+|---|---|---|
+| `powerbi-refresh-failed` ❌ | a refresh of a watched dataset Failed | `refresh-failed` |
+| `powerbi-refresh-completed` ✅ | a refresh of a watched dataset Completed | `refresh-completed` |
+
+Required extra args: `--dataset WORKSPACE_GUID:DATASET_GUID` (repeatable; `me:DATASET_GUID` for My workspace). Optional: `--history N=10` refreshes inspected, `--limit N=10` lines, `--include-cancelled` (failed mode).
+Example: `watch_script(session_id=<id>, script="powerbi_watch.py", watcher="powerbi-refresh-failed", integration="${{instance.name}}", args=["--dataset","<ws-guid>:<ds-guid>"], schedule="cron:*/10 * * * *", prompt="Power BI refresh failed: find the cause and report", retries=3)`.

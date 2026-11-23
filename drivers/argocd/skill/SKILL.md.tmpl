@@ -1,0 +1,50 @@
+---
+name: ${{skill.name}}
+description: "Use when: ANY Argo CD read or action on the ${{config.title}} instance (`${{instance.name}}`, ${{config.base_url}}) — applications, appsets, projects, sync/diff/rollback, and watchers."
+---
+
+# ${{skill.name}} — Argo CD `${{instance.name}}` (${{config.base_url}})
+
+Always run the CLI with the instance flag (several Argo CD servers may be configured, each has its own skill):
+
+`${{driver.python}} ${{driver.cli}} --instance ${{instance.name}} <command>`
+
+It wraps the native `argocd` binary and uses the user's own `argocd login` session; there is no token to handle. If a command says the login is missing/expired, ask the user to run `argocd login <host> --sso` in a terminal (do not try to log in yourself). `<app>` = `name` or `namespace/name`. `<command> -h` shows options.
+
+## Reads
+| Question | Command |
+|---|---|
+| Connection check (config, binary, server, login, apps) | `test` |
+| App list with health/sync | `apps [--project P] [--selector S] [--out-of-sync] [--unhealthy] [--limit 100]` |
+| One app: health, sync, revision, destination, conditions | `app <app>` |
+| Resource tree (kind/name/health/sync) | `tree <app> [--unhealthy] [--limit 200]` |
+| Live vs desired diff | `diff <app> [--revision R] [--max-chars 6000]` |
+| Deployment history | `history <app> [--limit 10]` |
+| Why is it broken (conditions, failed operation, unhealthy resources — the "events" view) | `problems <app>` |
+| Pod logs of the app | `logs <app> [--kind Deployment --resource-name N --namespace NS --container C] [--tail 100] [--grep RE] [--previous]` |
+| ApplicationSets / projects | `appsets`, `appset <name>`, `projects`, `project <name>` |
+| Clusters / repos (metadata only; credentials are never shown) | `clusters`, `repos` |
+
+## Writes (confirm-first)
+`refresh <app> [--hard]`, `sync <app> [--revision R] [--prune] [--dry-run]`, `rollback <app> <history_id> [--prune]`.
+Without `--yes` they only print a PREVIEW and execute nothing. Procedure: run `diff` (and `sync --dry-run`), show the preview in chat naming the instance (`${{instance.name}}`), app, revision and prune, and re-run with `--yes` only after the user explicitly confirms. `rollback` needs auto-sync disabled on the app; `--prune` deletes resources, so call it out. Never run writes for several apps in one go without confirming the list.
+
+## Scope
+Instance options `project` and `app_selector` (if set) limit lists and watchers and block access to apps of other projects; an "outside this instance's scope" error means use another instance or ask the user.
+
+## Rules
+- **Don't explore**: everything is documented here; don't read the CLI source or hunt for script paths.
+- Save large outputs (diffs, logs) to `/tmp` and grep; don't paste them whole into context.
+- Report only what the CLI returned; if the server returned an error, quote it (secrets are masked by the CLI).
+
+## Watchers
+Script watchers (no model turn until something changes) via `watch_script(script="argocd_watch.py", integration="${{instance.name}}", watcher=<id>)`. Scripts live in `${{driver.watch_dir}}`; never invoke them by hand, validate with `dry_run=true` and say clearly that a dry run was not registered. Exit 0 silent / 200 changed / other = error; the first run is a silent baseline. One bounded `app list` per run.
+
+| watcher id | Fires on | Leading args |
+|---|---|---|
+| `argocd-out-of-sync` 🔄 | app turned OutOfSync (or a new app is OutOfSync) | `out-of-sync [--app A] [--project P] [--selector S] [--limit N=200]` |
+| `argocd-health` 💔 | health status changed (Healthy/Progressing/Degraded/...) | `health [--only-degraded] [--app A] [--project P] [--selector S]` |
+| `argocd-sync` 🚀 | a sync operation finished (Succeeded/Failed/Error), once per operation | `sync [--app A] [--project P] [--selector S]` |
+
+The leading mode is added automatically; pass only extra filters in `args`. After a sync you started, register `argocd-sync --app <app>` with `until_changed=true` and wait instead of polling.
+Example: `watch_script(session_id=<id>, script="argocd_watch.py", watcher="argocd-health", integration="${{instance.name}}", args=["--only-degraded"], schedule="cron:*/10 * * * *", prompt="app degraded: investigate with problems/logs", retries=3)`.

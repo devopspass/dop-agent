@@ -1,0 +1,61 @@
+---
+name: ${{skill.name}}
+description: "Use when: ANY Microsoft Teams read or action for ${{config.account}} (${{config.title}}) — chats, transcripts, calendar, meetings, and watchers."
+---
+
+# ${{skill.name}} — Teams as ${{config.account}} (${{config.title}})
+
+Integration instance: `${{instance.name}}`. Always run the CLI with the instance flags:
+
+`${{driver.python}} ${{driver.cli}} --cdp-url ${{config.cdp_url}} --account ${{config.account}} <command>`
+
+Tokens are never printed; never echo them. If the user names another Teams account/tenant, use that account's own skill instead.
+
+## Commands
+| Need | Command |
+|---|---|
+| List chats (get chatId) | `chats-list [--json]` (default: `{count, conversations}`; `--json`: bare list) |
+| Read chat messages | `chats-read <chatId> [--limit N]` (default 5, newest first) |
+| Call transcript (WebVTT from recording chat msg) | `transcript <chatId> [--limit N=50] [--index I=0 (0 = most recent)] [--save path]` |
+| Send message (`me` = self-chat) | `send <chatId\|me> <text>` |
+| Upcoming events | `cal-list [--days N=7]` |
+| Create event | `cal-create <title> <startISO> <endISO> [--teams]` |
+| Delete event | `cal-delete <eventId>` |
+| Audit recording settings of upcoming meetings | `meeting-audit [--days N=30]` |
+| Set auto record/transcribe | `meeting-set-recording <joinUrl> <mode>` |
+| User profile by email | `user-info <email>` |
+| User photo | `user-avatar <email> [--save path]` |
+| Joined teams | `teams-list` |
+| Check the connection (CDP, tab, token, Graph) | `test` |
+
+`mode`: `AutoRecordingAndTranscription` | `AutoTranscriptionOnly` | `AutoRecordingOnly` | `Off`. ISO times like `2026-12-01T09:00:00`.
+
+## Requirements
+- Browser with remote debugging at `${{config.cdp_url}}` and a signed-in Teams web tab (`teams.cloud.microsoft` / `teams.microsoft.com`) for `${{config.account}}`. Tokens (Graph, IC3, skype) are read from that tab's MSAL cache via CDP. Needs `pip install websocket-client`. A mismatch error lists the available accounts/tabs.
+- Expired tokens are renewed automatically (the CLI reloads the Teams tab or opens a temporary background tab). If a command fails with "No Teams tab found" or "No unexpired token", ask the user to open/refresh that tab.
+
+## Rules
+- **Don't explore, everything is documented here.** Never run `--help`, `ls`/`find` for scripts, or read the watcher source: the CLI commands and all watcher flags are listed in this file, and watcher scripts are only run through `watch_script` (they live in `${{driver.watch_dir}}`, never invoke them by hand). To validate a watch use `watch_script(..., dry_run=true)`.
+- The self-chat id is `48:notes` (CLI shortcut: `me` for `send`); the chat id of anyone else comes from `chats-list`.
+- **Sending is a real action**: draft the text in chat first, name the account (`${{config.account}}`) and the recipient, and send only after explicit user approval. Test with `send me "..."` (self-chat) only.
+- `cal-create` without attendees only; adding attendees would email real people (don't do it without explicit consent).
+- Not supported: downloading recordings (mp4); device-code login (blocked by Conditional Access).
+- Save big outputs (transcripts, chat dumps) to `/tmp` and grep/summarize; don't paste them whole into context.
+- Typical flow: `chats-list` → pick chatId → `chats-read` / `transcript`.
+
+## Watchers (wake the session on change; do not poll Teams yourself)
+Use the `watch_script` tool with `script="teams_watch.py"`, `integration="${{instance.name}}"` (injects this account's CDP URL/account) and `watcher=<id>` (picks the icon shown in the watchers list). Token-free: exit 0 silent / 200 changed / other = error; the first run is a silent baseline (messages sent before it are not reported, so tell the user to send a new message after registering).
+
+| watcher id | Fires on | Leading args |
+|---|---|---|
+| `teams-messages` 💬 | new chat messages | `messages [--chat ID] [--from NAME]... [--match REGEX] [--exclude-self] [--mentions-me] [--files] [--kind text\|any]` |
+| `teams-mentions` 📣 | @mentions of me | `messages --mentions-me` |
+| `teams-files` 📎 | files shared | `messages --files --kind any` |
+| `teams-transcript` 📝 | transcript/recording ready | `transcript [--chat ID] [--what transcript\|recording=transcript]` |
+| `teams-meeting-soon` 📅 | meeting starts soon | `meeting-soon [--minutes N=5]` |
+| `teams-meeting-started` ▶️ | meeting started | `meeting-started` |
+| `teams-meeting-new` 🆕 | new calendar meeting | `meeting-created [--days D=30]` |
+| `teams-meeting-changed` 🗓️ | cancelled/rescheduled | `meeting-changed [--days D=30]` |
+
+The leading mode/flags of the chosen watcher are added automatically; pass only the extra filters in `args`. Flag semantics (all filters are ANDed): `--chat ID` limits to one chat (default: any chat whose last message changed); `--from NAME` repeatable, case-insensitive substring of the sender's name; `--match REGEX` case-insensitive regex on the message text; `--exclude-self` drops my own messages (**don't use it for the self-chat `48:notes`**: every message there is mine); `--mentions-me` only @mentions; `--files` only messages with attachments; `--kind text` (default) = plain text messages only, `any` = all message types. Common: `--limit N=20` messages read per changed chat, `--max-chars N=200` text cut per message.
+Example: `watch_script(session_id=<id>, script="teams_watch.py", watcher="teams-transcript", integration="${{instance.name}}", args=["--chat","<chatId>"], schedule="cron:*/5 * * * *", prompt="transcript ready: fetch with the CLI transcript command and summarize", retries=3)`.

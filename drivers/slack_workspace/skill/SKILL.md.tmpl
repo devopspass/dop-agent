@@ -1,0 +1,42 @@
+---
+name: ${{skill.name}}
+description: "Use when: ANY Slack read/action on the external workspace ${{config.base_url}} (`${{config.title}}`) — channels, history and threads, message search, users, permalinks, posting, and watchers."
+---
+
+# ${{skill.name}} — Slack workspace `${{instance.name}}` (${{config.base_url}})
+
+Run the CLI with the instance flag (several workspaces may be configured, each has its own skill). This is NOT the bot's own Slack; never use it for the bot's DM/thread replies.
+
+`${{driver.python}} ${{driver.cli}} --instance ${{instance.name}} <command>`
+
+Do not explore script paths; run `... --help` if unsure. Credentials come from the integration config; never print a token, never `cat` config/state files. Channels are IDs (`C0123ABCD`) or `#name` (name lookup scans visible channels; prefer IDs); `ts` is `1700000000.123456` or the permalink `p…` form.
+
+## Commands
+| Need | Command |
+|---|---|
+| Connection check (config, auth, channels, search) | `test` |
+| List/find channels | `channels [--query Q] [--types public_channel,private_channel,im,mpim] [--limit 100]` |
+| Channel history (oldest first) | `history <channel> [--since 2h\|3d\|YYYY-MM-DD] [--limit 20]` |
+| Thread | `thread <channel> <ts> [--limit 50]` |
+| Search messages (user token, `search:read`) | `search '<query>' [--limit 20]` (Slack syntax: `in:#chan from:@user after:2026-01-01`) |
+| User lookup | `user <U-ID\|@handle\|email>`, `users [--query Q]` |
+| Permalink | `permalink <channel> <ts>` |
+| Post / reply | `post <channel> '<text>' [--thread-ts TS] [--yes]` |
+
+## Posting (write action - draft first)
+1. Run `post` WITHOUT `--yes`: it prints a DRAFT with workspace, posting identity, resolved channel and text; nothing is sent.
+2. Show the user workspace, channel, thread (if any) and the exact text; wait for explicit confirmation. Never post on your own initiative, never to a channel the user did not name.
+3. Re-run the identical command with `--yes`; report the returned permalink. If the instance has `write_mode: none`, tell the user it is read-only.
+
+## Access model
+Bot tokens (`xoxb-`) only see channels the bot joined and cannot `search`; user tokens (`xoxp-`) see what the user sees. `missing_scope`/`not_in_channel` errors name what to add; tell the user, don't retry. Keep scans bounded (`--since`, `--limit`).
+
+## Watchers (script watches; recipes pin this instance)
+Register with `watch_script(script="slack_watch.py", watcher=<recipe>, integration="${{instance.name}}", args=[...])`; the first run records a baseline and is silent. Use `dry_run` first for plugin drivers and report clearly whether a watch was only dry-run or registered.
+
+| Recipe | Flags |
+|---|---|
+| `slack-ws-new-messages` | `--channel C` (repeatable, ≤10), `--keyword K` (repeatable), `--include-self`, `--limit N` |
+| `slack-ws-mentions` | `--channel C` (repeatable): messages containing `<@token-user>` |
+| `slack-ws-thread-replies` | `--channel C --thread-ts TS` |
+| `slack-ws-channel-threads` | `--channel C --days D` (default 3, max 14): new replies in recent threads |

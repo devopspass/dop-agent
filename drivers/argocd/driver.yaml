@@ -1,0 +1,47 @@
+# Package driver: Argo CD. CLI (wraps the `argocd` binary) + watcher scripts + skill template; no polling in the bot.
+# Generic: no server is built in; every instance sets its own base_url (config.yaml -> integrations.<name>),
+# several instances = several Argo CD servers, each with its own skill. Auth is the `argocd` CLI login session of the
+# user (`argocd login <host> --sso`, stored by argocd itself): the driver holds NO token/secret and never reads the
+# argocd session file. Off unless an instance is configured.
+id: argocd
+title: Argo CD
+type: package
+icon: argocd
+auth:
+  types:
+    argocd_cli: { title: "argocd CLI login session (no secret stored by dop-agent)", fields: {} }
+settings:
+  base_url: { required: true, example: "https://argocd.example.com" }
+options:
+  project:       { type: string, default: "", pattern: '([A-Za-z0-9][A-Za-z0-9._-]{0,62})?',
+                   help: "Limit lists, watchers and writes to this AppProject (empty = all projects)" }
+  app_selector:  { type: string, default: "", pattern: '([A-Za-z0-9][A-Za-z0-9._/=!,() -]{0,200})?',
+                   help: "Label selector applied to app lists and watchers, e.g. team=payments (empty = all)" }
+  argocd_bin:    { type: string, default: "argocd", pattern: '[A-Za-z0-9._/~][A-Za-z0-9._/~+-]{0,199}',
+                   help: "argocd binary name or absolute path (looked up on PATH, /opt/homebrew/bin, /usr/local/bin, ~/.local/bin)" }
+  insecure:      { type: bool, default: false, help: "Skip TLS certificate verification (self-signed server)" }
+  title:         { type: string, pattern: '[^"`$\\<>]{0,80}', help: "Short label for lists and the skill description (default: the instance name)" }
+cli:
+  entry: cli/cli.py
+  global_args: ["--instance", "${{instance.name}}"]
+env:
+  ARGOCD_INSTANCE: "${{instance.name}}"
+skill:
+  template: skill/SKILL.md.tmpl
+  name: argocd
+watchers:                                       # script watches (no model turn until something changes)
+  argocd-out-of-sync: { script: argocd_watch.py, args: [out-of-sync], emoji: "🔄", slack_emoji: ":arrows_counterclockwise:", title: App became OutOfSync }
+  argocd-health:      { script: argocd_watch.py, args: [health],      emoji: "💔", slack_emoji: ":broken_heart:", title: App health changed (Degraded, Healthy, ...) }
+  argocd-sync:        { script: argocd_watch.py, args: [sync],        emoji: "🚀", slack_emoji: ":rocket:", title: Sync operation finished (succeeded/failed) }
+kinds:
+  application:
+    # Argo CD UI links: /applications/<name> (older) or /applications/<namespace>/<name> (2.5+)
+    url_match: '^{base_url}/applications/(?:(?P<ns>[A-Za-z0-9][A-Za-z0-9.-]*)/)?(?P<name>[A-Za-z0-9][A-Za-z0-9.-]*)/?(?:[?#].*)?$'
+    card: { fields: [project, health, sync, revision, cluster], icon: argocd, label: '{name}' }
+  applicationset:
+    url_match: '^{base_url}/applicationsets/(?:(?P<ns>[A-Za-z0-9][A-Za-z0-9.-]*)/)?(?P<name>[A-Za-z0-9][A-Za-z0-9.-]*)/?(?:[?#].*)?$'
+    card: { fields: [project, status, generators, applications], icon: argocd, label: 'AppSet {name}' }
+  project:
+    url_match: '^{base_url}/settings/projects/(?P<name>[A-Za-z0-9][A-Za-z0-9.-]*)/?(?:[?#].*)?$'
+    card: { fields: [description, destinations, sources], icon: argocd, label: 'Project {name}' }
+version: 1

@@ -1,0 +1,1854 @@
+/* Slack-like color palette (Aubergine sidebar + Slack blue accents) */
+:root {
+  /* Dark theme tuned for long sessions: muted plum sidebar, elevation via small
+     lightness steps, desaturated accents, no pure white text. */
+  --slack-sidebar-bg: #231a29;
+  --slack-sidebar-header-bg: #1d1623;
+  --slack-sidebar-hover: #2d2234;
+  --slack-sidebar-active: #2f6fae;
+  --slack-sidebar-border: #35293d;
+  --slack-main-bg: #1a1d21;
+  --slack-bubble-assistant-bg: #1f2328;
+  --slack-bubble-user-bg: #262a30;
+  --slack-bubble-system-bg: #262a30;
+  --slack-text-primary: #c4c7cc;
+  --slack-text-secondary: #9aa0a8;
+  --slack-border: #2d3138;
+  --slack-link: #6aa9dc;
+  --slack-accent: #2f6fae;
+  /* Soft text scale replacing hard-coded whites/greys (light.css overrides these) */
+  --ct-fff: #e6e8eb;
+  --ct-ffffff: #e6e8eb;
+  --ct-eee: #dcdfe3;
+  --ct-ddd: #cfd2d6;
+  --ct-ccc: #c4c7cc;
+  --ct-bbb: #b2b6bc;
+  --ct-aaa: #9aa0a8;
+  --ct-999: #9aa0a8;
+  --ct-9a9a9a: #9aa0a8;
+  --ct-888: #8a9098;
+  --ct-9aa0a6: #9aa0a8;
+  --ct-8f9194: #8a9098;
+  --ct-d1d2d3: #c4c7cc;
+  --ct-d6d8dd: #c9ccd1;
+  --ct-e4e9ee: #d5d9de;
+  --ct-6cc7ff: #7fb8e0;
+  --ct-9fd6ff: #8fc0e4;
+  --ct-6c8ef5: #7f9ae0;
+  --ct-7ee2a8: #7cc9a0;
+  --ct-6bd1b0: #6dbd9f;
+  --ct-ff9b9b: #e59a9a;
+  --ct-bcabbc: #b3a6bb;
+  --ct-cfc3cf: #c5bacb;
+  --ct-e8dce8: #dcd2e0;
+  --ct-e8dde8: #dcd2e0;
+  --ct-a898b2: #a095aa;
+}
+
+* { box-sizing: border-box; }
+html { color-scheme: dark; }
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+  background: var(--slack-main-bg);
+  color: var(--slack-text-primary);
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Login page */
+.login-body { display: flex; align-items: center; justify-content: center; }
+.login-box {
+  background: var(--slack-sidebar-header-bg);
+  padding: 40px;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 320px;
+  border: 1px solid var(--slack-sidebar-border);
+}
+.login-box h1 {
+  margin: 0 0 12px;
+  font-size: 20px;
+  text-align: center;
+  color: var(--ct-fff,#fff);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.login-logo { width: 24px; height: 24px; border-radius: 5px; margin-right: 8px; vertical-align: middle; }
+.login-box input {
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--slack-sidebar-border);
+  background: var(--slack-main-bg);
+  color: var(--ct-fff,#fff);
+  font-size: 14px;
+}
+.login-box button {
+  padding: 10px 12px;
+  border-radius: 6px;
+  border: none;
+  background: var(--slack-accent);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+}
+.login-box button:hover { background: #0b4f80; }
+.error { color: #e01e5a; font-size: 13px; min-height: 16px; margin: 0; }
+
+/* App layout */
+.layout { display: flex; flex: 1; min-height: 0; }
+.sidebar {
+  width: 300px;
+  min-width: 180px;
+  max-width: 600px;
+  background: var(--slack-sidebar-bg);
+  border-right: 1px solid var(--slack-sidebar-border);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  flex-shrink: 0;
+  transition: width 0.15s ease;
+}
+.sidebar.resizing { transition: none; }
+.sidebar.collapsed {
+  width: 0 !important;
+  min-width: 0;
+  border-right: none;
+}
+/* Inner wrapper clips the session list/search/etc as the sidebar shrinks
+   toward 0, while the collapse button/resize handle stay direct children
+   of .sidebar (not clipped) so they remain visible/clickable even when
+   fully collapsed - overflow:hidden on .sidebar itself would clip those
+   too, since the collapse button is intentionally positioned just
+   outside the sidebar's own box (see .sidebar-collapse-btn below). */
+.sidebar-inner {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+.sidebar-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -3px;
+  width: 6px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 5;
+}
+.sidebar-resize-handle:hover, .sidebar-resize-handle.dragging { background: var(--slack-accent); opacity: 0.5; }
+.sidebar-collapse-btn {
+  position: absolute;
+  top: 8px;
+  right: -14px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 1px solid var(--slack-sidebar-border);
+  background: var(--slack-sidebar-bg);
+  color: var(--ct-fff,#fff);
+  font-size: 13px;
+  cursor: pointer;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+}
+.sidebar-collapse-btn:hover { background: var(--slack-sidebar-hover); }
+.sidebar.collapsed .sidebar-collapse-btn { right: -22px; }
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: var(--slack-sidebar-header-bg);
+  border-bottom: 1px solid var(--slack-sidebar-border);
+}
+.sidebar-header h2 { margin: 0; font-size: 15px; color: var(--ct-fff,#fff); flex: 1; }
+.sidebar-logo { width: 22px; height: 22px; border-radius: 4px; flex: 0 0 auto; margin-right: 6px; }
+#new-session-btn {
+  background: var(--slack-accent);
+  border: none;
+  color: #fff;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  font-size: 16px;
+  cursor: pointer;
+}
+#jump-unread-btn {
+  background: rgba(var(--ov,255,255,255), 0.1);
+  border: none;
+  color: var(--ct-fff,#fff);
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+  margin-right: 8px;
+}
+#jump-unread-btn:hover { background: rgba(var(--ov,255,255,255), 0.2); }
+/* Brief shake feedback when clicked with no unread sessions to jump to,
+   so the button always visibly responds to a click instead of silently
+   doing nothing. */
+#jump-unread-btn.jump-unread-none { animation: jump-unread-shake 0.4s; }
+@keyframes jump-unread-shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-3px); }
+  75% { transform: translateX(3px); }
+}
+.watches-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+.watches-panel {
+  background: var(--cb-1a1d21,#1a1d21);
+  border: 1px solid var(--slack-border);
+  border-radius: 8px;
+  width: 560px;
+  max-width: 92vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+/* Wider variant for the Watches panel specifically - the grouped/filterable
+   layout (toolbar, summary chips, per-row previews/actions) needs more
+   horizontal room than the plain list the generic .watches-panel width
+   was sized for (shortcuts/settings panels keep the original width). */
+.watches-panel-wide { width: 720px; }
+.watches-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--slack-border);
+}
+.watches-panel-header h2 { margin: 0; font-size: 15px; color: var(--ct-fff,#fff); flex: 1; }
+.watches-include-inactive { font-size: 12px; color: var(--ct-ccc,#ccc); display: flex; align-items: center; gap: 4px; }
+#watches-close-btn {
+  background: none;
+  border: none;
+  color: var(--ct-ccc,#ccc);
+  font-size: 16px;
+  cursor: pointer;
+}
+.shortcuts-panel { width: 420px; }
+.shortcuts-list { overflow-y: auto; padding: 8px 16px 16px; }
+.shortcut-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(var(--ov,255,255,255), 0.06);
+  color: var(--ct-ddd,#ddd);
+  font-size: 13px;
+}
+.shortcut-row kbd {
+  background: rgba(var(--ov,255,255,255), 0.12);
+  border: 1px solid rgba(var(--ov,255,255,255), 0.2);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-family: inherit;
+  font-size: 12px;
+  color: var(--ct-fff,#fff);
+}
+.shortcut-row span { flex: 1; }
+.settings-panel { width: 420px; }
+.settings-section { padding: 8px 16px 16px; }
+.settings-section-title {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ct-888,#888);
+  margin: 8px 0;
+}
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+  color: var(--ct-ddd,#ddd);
+  font-size: 13px;
+}
+.settings-quiet-hours-times {
+  padding-left: 24px;
+  gap: 16px;
+}
+.settings-quiet-hours-times label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--ct-ccc,#ccc);
+  font-size: 13px;
+}
+.settings-quiet-hours-times input[type="time"] {
+  background: rgba(var(--ov,255,255,255), 0.08);
+  border: 1px solid rgba(var(--ov,255,255,255), 0.2);
+  border-radius: 4px;
+  color: var(--ct-fff,#fff);
+  padding: 2px 6px;
+}
+.settings-hint {
+  color: var(--ct-888,#888);
+  font-size: 12px;
+  padding-left: 24px;
+  margin-top: 4px;
+}
+.watches-empty { padding: 20px; text-align: center; color: var(--ct-888,#888); font-size: 13px; }
+.watches-retry-btn {
+  display: block;
+  margin: 10px auto 0;
+  background: rgba(var(--ov,255,255,255), 0.1);
+  border: 1px solid var(--slack-border);
+  border-radius: 4px;
+  color: var(--ct-fff,#fff);
+  font-size: 12px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+.watches-retry-btn:hover { background: rgba(var(--ov,255,255,255), 0.18); }
+
+/* Toolbar: search box + broken-only toggle, sits above the summary/legend. */
+.watches-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--slack-border);
+}
+.watches-search {
+  flex: 1;
+  background: rgba(var(--ov,255,255,255), 0.08);
+  border: 1px solid rgba(var(--ov,255,255,255), 0.2);
+  border-radius: 4px;
+  color: var(--ct-fff,#fff);
+  font-size: 12px;
+  padding: 5px 8px;
+}
+.watches-search::placeholder { color: var(--ct-888,#888); }
+.watches-broken-only-toggle { font-size: 12px; color: var(--ct-ccc,#ccc); display: flex; align-items: center; gap: 4px; white-space: nowrap; }
+
+/* Summary counts bar - quick "at a glance" totals per status, and a
+   "Showing X of Y" note when search/broken-only filtering hides rows. */
+.watches-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  font-size: 11px;
+  flex-wrap: wrap;
+}
+.watches-summary:empty { display: none; }
+.watches-summary-chip {
+  padding: 1px 8px;
+  border-radius: 10px;
+  background: rgba(var(--ov,255,255,255), 0.08);
+  color: var(--ct-ccc,#ccc);
+}
+.watches-summary-chip-active { background: rgba(26, 127, 55, 0.3); color: var(--ct-7ee2a8,#7ee2a8); }
+.watches-summary-chip-broken { background: rgba(165, 32, 32, 0.35); color: var(--ct-ff9b9b,#ff9b9b); }
+.watches-summary-chip-paused { background: rgba(var(--ov,255,255,255), 0.1); color: var(--ct-ddbb66,#ddbb66); }
+.watches-summary-chip-done { background: rgba(var(--ov,255,255,255), 0.06); color: var(--ct-999,#999); }
+.watches-summary-filtered { color: var(--ct-888,#888); margin-left: auto; }
+
+/* Type/status legend - explains the emoji+color vocabulary used throughout
+   the panel so it's not "tribal knowledge" for anyone glancing at it. */
+.watches-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  padding: 6px 16px;
+  border-bottom: 1px solid var(--slack-border);
+  font-size: 11px;
+  color: var(--ct-999,#999);
+}
+.watches-legend-types, .watches-legend-statuses { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.watches-legend-item { display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.watch-status-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; }
+.watch-status-dot-active { background: #4fae8a; }
+.watch-status-dot-paused { background: #ddbb66; }
+.watch-status-dot-broken { background: #e01e5a; }
+.watch-status-dot-done { background: var(--cb-666,#666); }
+
+.watches-list { overflow-y: auto; padding: 8px 0; }
+
+/* Loading skeleton shown while the initial /api/watches fetch is pending;
+   hints at the row layout so the panel doesn't pop once data arrives. */
+.watches-skeleton { padding: 8px 16px; }
+.watch-item-skeleton {
+  height: 38px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, rgba(var(--ov,255,255,255),0.04) 25%, rgba(var(--ov,255,255,255),0.09) 37%, rgba(var(--ov,255,255,255),0.04) 63%);
+  background-size: 400% 100%;
+  animation: watches-skeleton-shimmer 1.4s ease infinite;
+}
+@keyframes watches-skeleton-shimmer {
+  0% { background-position: 100% 50%; }
+  100% { background-position: 0 50%; }
+}
+
+/* Group headers - one per watch type, collapsible/persisted via
+   localStorage (see WATCHES_COLLAPSED_KEY in app.js). Sticky so the type
+   you're scrolled into stays identifiable in a long, mixed-type list. */
+.watch-group-header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 16px;
+  background: var(--cb-22262b,#22262b);
+  border-bottom: 1px solid var(--slack-border);
+  border-top: 1px solid var(--slack-border);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ct-ddd,#ddd);
+  cursor: pointer;
+  user-select: none;
+}
+.watch-group-header:hover { background: var(--cb-282c32,#282c32); }
+.watch-group-toggle { width: 10px; flex-shrink: 0; color: var(--ct-888,#888); }
+.watch-group-count {
+  margin-left: auto;
+  background: rgba(var(--ov,255,255,255), 0.1);
+  color: var(--ct-ccc,#ccc);
+  border-radius: 10px;
+  padding: 0 7px;
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.watch-item {
+  padding: 8px 16px;
+  border-bottom: 1px solid rgba(var(--ov,255,255,255), 0.06);
+  border-left: 3px solid transparent;
+}
+/* Per-type left-border accent, same vocabulary as the emoji/legend. */
+.watch-type-mr { border-left-color: #6c8ef5; }
+.watch-type-pipeline { border-left-color: #e0a92e; }
+.watch-type-job { border-left-color: #8e8ee0; }
+.watch-type-ticket { border-left-color: #4fb0e0; }
+.watch-type-teams { border-left-color: #c76be0; }
+.watch-type-time { border-left-color: #6bd1b0; }
+.watch-type-self_restart { border-left-color: #999; }
+/* Paused/done rows are dimmed so attention naturally goes to active/broken
+   ones first in a mixed list. */
+.watch-status-paused, .watch-status-done { opacity: 0.55; }
+.watch-item-top { display: flex; align-items: center; gap: 8px; }
+.watch-type-emoji { flex-shrink: 0; }
+.watch-label { flex: 1; min-width: 0; color: var(--ct-fff,#fff); font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.watch-status-badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  background: rgba(var(--ov,255,255,255), 0.1);
+  color: var(--ct-ccc,#ccc);
+  text-transform: uppercase;
+}
+.watch-status-active .watch-status-badge { background: #1a7f37; color: #fff; }
+.watch-status-broken .watch-status-badge { background: #a52020; color: #fff; }
+.watch-status-paused .watch-status-badge { background: #8a6d1f; color: #fff; }
+.watch-status-done .watch-status-badge { background: rgba(var(--ov,255,255,255), 0.08); color: var(--ct-999,#999); }
+.watch-meta { font-size: 11px; color: var(--ct-999,#999); margin-top: 2px; }
+.watch-meta-secondary { color: #777; }
+.watch-key { font-family: ui-monospace, "SF Mono", Menlo, monospace; font-size: 10.5px; color: var(--ct-aaa,#aaa); }
+.watch-session-link { color: var(--ct-6c8ef5,#6c8ef5); text-decoration: none; }
+.watch-session-link:hover { text-decoration: underline; }
+.watch-broken-reason {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--ct-ff9b9b,#ff9b9b);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.watch-next-fire { margin-top: 4px; font-size: 11px; color: var(--ct-6bd1b0,#6bd1b0); }
+
+/* Expand toggle for long labels - critical for `time` watches, whose
+   label IS the literal prompt text (not a short nickname), since a native
+   title="" tooltip doesn't wrap/read reliably for multi-sentence prompts. */
+.watch-label-expand-btn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  color: var(--ct-999,#999);
+  font-size: 12px;
+  line-height: 1;
+  padding: 3px 4px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.watch-label-expand-btn:hover { background: rgba(var(--ov,255,255,255), 0.1); color: var(--ct-fff,#fff); }
+.watch-full-text {
+  margin-top: 4px;
+  padding: 6px 8px;
+  background: rgba(var(--ov,255,255,255), 0.05);
+  border-left: 2px solid #6c8ef5;
+  border-radius: 4px;
+  font-size: 12px;
+  color: var(--ct-ddd,#ddd);
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.watch-preview {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--ct-ccc,#ccc);
+}
+.watch-preview:empty { display: none; }
+.watch-preview-link { color: var(--ct-6c8ef5,#6c8ef5); text-decoration: none; }
+.watch-preview-link:hover { text-decoration: underline; }
+.watch-preview-status { color: var(--ct-999,#999); }
+
+/* Inline row actions (recheck/pause/resume/remove): plain icon buttons. */
+.watch-actions { display: flex; gap: 2px; flex-shrink: 0; margin-left: auto; }
+.watch-action-btn {
+  background: none;
+  border: none;
+  color: var(--ct-999,#999);
+  font-size: 13px;
+  line-height: 1;
+  padding: 3px 5px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.watch-action-btn:hover { background: rgba(var(--ov,255,255,255), 0.1); color: var(--ct-fff,#fff); }
+.watch-action-btn-danger:hover { background: rgba(165, 32, 32, 0.35); color: var(--ct-ff9b9b,#ff9b9b); }
+
+/* Responsive: narrower viewports (mobile Safari/Chrome on the Web UI)
+   shouldn't force horizontal scrolling or a panel wider than the screen. */
+@media (max-width: 760px) {
+  .watches-panel-wide { width: 96vw; }
+  .watches-toolbar { flex-wrap: wrap; }
+  .watch-actions { margin-left: 0; }
+  .watch-item-top { flex-wrap: wrap; }
+}
+
+/* Header health/status strip */
+.health-strip {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 3px 16px;
+  background: var(--cb-0f1113,#0f1113);
+  border-bottom: 1px solid var(--slack-border);
+  font-size: 11px;
+  color: var(--ct-999,#999);
+  flex-shrink: 0;
+}
+.health-item { display: flex; align-items: center; gap: 5px; }
+.health-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--cb-666,#666);
+  flex-shrink: 0;
+}
+.health-item.health-ok .health-dot { background: #4fae8a; }
+.health-item.health-bad .health-dot { background: #e01e5a; }
+/* Watch count badge next to "Watchers" in the health strip: a muted pill
+   that turns red when any watch is broken, matching the status dot. */
+.health-item-count {
+  font-size: 10px;
+  color: var(--ct-999,#999);
+  background: rgba(var(--ov,255,255,255), 0.08);
+  border-radius: 8px;
+  padding: 0 5px;
+  margin-left: 2px;
+}
+.health-item-count:empty { display: none; }
+.health-item-count-bad { background: rgba(224, 30, 90, 0.35); color: var(--ct-ff9b9b,#ff9b9b); }
+/* The Watchers health item opens the watches overlay; underline on hover
+   marks it as clickable, unlike the plain status readouts beside it. */
+.health-item-clickable { cursor: pointer; }
+.health-item-clickable:hover { color: var(--ct-fff,#fff); text-decoration: underline; }
+/* MCP status hover popover — hover-triggered (not click, unlike the other
+   header popovers) since it's read-only status info, no action to take
+   before dismissing. Positioned like the other header popovers (absolute,
+   anchored under the trigger) but attached to health-item-hoverable so the
+   :hover rule alone drives visibility - no JS show/hide wiring needed
+   beyond populating its contents on each health poll. */
+.health-item-hoverable { position: relative; cursor: default; }
+.health-item-hoverable:hover .mcp-status-popover { display: block; }
+.mcp-status-popover {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 30;
+  background: var(--slack-panel, var(--cb-222,#222));
+  border: 1px solid var(--slack-border);
+  border-radius: 6px;
+  padding: 8px 0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  font-weight: 400;
+  color: var(--ct-fff,#fff);
+  width: 340px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.mcp-status-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 5px 14px;
+  font-size: 12px;
+}
+.mcp-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--cb-666,#666);
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+.mcp-status-dot.mcp-status-ok { background: #4fae8a; }
+.mcp-status-dot.mcp-status-error { background: #e01e5a; }
+.mcp-status-dot.mcp-status-warning { background: #ecb22e; }
+.mcp-status-dot.mcp-status-unknown { background: var(--cb-666,#666); }
+.mcp-status-body { min-width: 0; }
+.mcp-status-name { color: var(--ct-fff,#fff); font-weight: 600; }
+.mcp-status-detail {
+  color: var(--ct-9aa0a6,#9aa0a6);
+  font-size: 11px;
+  margin-top: 1px;
+  word-break: break-word;
+}
+.mcp-status-empty { padding: 5px 14px; font-size: 12px; color: var(--ct-9aa0a6,#9aa0a6); }
+/* Pushes the Settings/watches links (below) to the far right of the strip
+   without needing a separate flex container - the strip itself is already
+   display:flex, so an empty flex:1 spacer element does the job. */
+.health-strip-spacer { flex: 1; }
+/* Minimal low-emphasis text link for overlay-opening actions. */
+.health-strip-link {
+  color: var(--ct-9aa0a6,#9aa0a6);
+  text-decoration: none;
+  cursor: pointer;
+}
+.health-strip-link:hover { color: var(--ct-fff,#fff); text-decoration: underline; }
+
+/* Sidebar full-text search box + result dropdown. Positioned relative so
+   the results list can be absolutely positioned to overlay the session
+   list underneath it, rather than pushing it down and shifting layout. */
+.sidebar-search {
+  position: relative;
+  padding: 8px 16px;
+  border-bottom: 1px solid var(--slack-sidebar-border);
+}
+#search-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(var(--ov,255,255,255), 0.15);
+  background: rgba(var(--ov,255,255,255), 0.08);
+  color: var(--ct-fff,#fff);
+  font-size: 13px;
+}
+#search-input::placeholder { color: rgba(var(--ov,255,255,255), 0.5); }
+/* "Also search messages" opt-in checkbox - default search only matches
+   session titles (client-side, no round trip); ticking this also queries
+   message content via /api/search. */
+.search-messages-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  font-size: 12px;
+  color: rgba(var(--ov,255,255,255), 0.65);
+  cursor: pointer;
+  user-select: none;
+}
+.search-messages-toggle input { cursor: pointer; }
+.search-results {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  top: 100%;
+  max-height: 60vh;
+  overflow-y: auto;
+  background: var(--cb-1a1d29,#1a1d29);
+  border: 1px solid rgba(var(--ov,255,255,255), 0.15);
+  border-radius: 6px;
+  z-index: 20;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+}
+.search-result {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(var(--ov,255,255,255), 0.06);
+  cursor: pointer;
+}
+.search-result:hover { background: rgba(var(--ov,255,255,255), 0.06); }
+.search-result-title { color: var(--ct-fff,#fff); font-size: 13px; font-weight: 600; }
+.search-result-snippet { color: rgba(var(--ov,255,255,255), 0.65); font-size: 12px; margin-top: 2px; }
+.search-empty { padding: 10px 12px; color: rgba(var(--ov,255,255,255), 0.5); font-size: 12px; }
+
+.session-list { overflow-y: auto; flex: 1; }
+.session-item {
+  padding: 10px 16px;
+  border-bottom: 1px solid rgba(var(--ov,255,255,255), 0.06);
+  cursor: pointer;
+  position: relative;
+}
+.session-item:hover { background: var(--slack-sidebar-hover); }
+.session-item.active { background: var(--slack-sidebar-active); }
+.session-item.pinned { background: rgba(var(--ov,255,255,255), 0.09); }
+.session-item.active.pinned { background: var(--slack-sidebar-active); }
+.session-item.drag-over { box-shadow: inset 0 2px 0 0 #fff; }
+.session-item-top { display: flex; align-items: center; gap: 6px; }
+.session-title {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ct-fff,#fff);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.session-title-input {
+  flex: 1;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--ct-fff,#fff);
+  background: rgba(var(--ov,255,255,255), 0.1);
+  border: 1px solid rgba(var(--ov,255,255,255), 0.35);
+  border-radius: 4px;
+  padding: 1px 4px;
+  outline: none;
+}
+.thread-title-input {
+  font-size: inherit;
+  font-weight: inherit;
+  color: inherit;
+  background: rgba(var(--ov,255,255,255), 0.1);
+  border: 1px solid rgba(var(--ov,255,255,255), 0.35);
+  border-radius: 4px;
+  padding: 1px 6px;
+  outline: none;
+  min-width: 200px;
+}
+/* Small spinning ring shown next to a session's title while a turn is
+   actively running for it (see /api/sessions "running" field) — the
+   session-list equivalent of Slack's own live-updating status message. */
+.session-running-spinner {
+  flex-shrink: 0;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 2px solid rgba(var(--ov,255,255,255), 0.25);
+  border-top-color: #fff;
+  animation: session-spin 0.8s linear infinite;
+}
+@keyframes session-spin { to { transform: rotate(360deg); } }
+/* Small solid dot shown next to a session's title when it has new activity
+   since it was last opened (server-side last_read_at, see isSessionUnread). */
+.session-unread-dot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #1264a3;
+}
+/* Sessions past LONG_SESSION_TURN_THRESHOLD turns get a subtle left-border
+   accent plus a highlighted turn count, so heavy/slow-loading sessions are
+   visible before you click into them. */
+.session-item.long-session { border-left: 3px solid #e8912d; }
+.session-turn-count-long { color: var(--ct-e8912d,#e8912d); font-weight: 700; }
+/* Sessions whose last turn errored/timed out (see web_server.py's
+   _session_payload() "errored" flag) get a red left-border accent plus a
+   ⚠️ badge next to the title, so a failed background turn is visible from
+   the sidebar without having to open the session first. */
+.session-item.errored-session { border-left: 3px solid #e01e5a; }
+.session-error-flag { flex-shrink: 0; font-size: 12px; }
+.session-pin-btn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  opacity: 0.35;
+  line-height: 1;
+}
+.session-item:hover .session-pin-btn { opacity: 0.75; }
+.session-pin-btn:hover { opacity: 1 !important; background: rgba(var(--ov,255,255,255), 0.12); }
+.session-item.pinned .session-pin-btn { opacity: 0.9; }
+.session-item.pinned[draggable="true"] { cursor: grab; }
+.session-item.pinned:active[draggable="true"] { cursor: grabbing; }
+.session-archive-btn {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  padding: 2px 4px;
+  border-radius: 4px;
+  opacity: 0.35;
+  line-height: 1;
+}
+.session-item:hover .session-archive-btn { opacity: 0.75; }
+.session-archive-btn:hover { opacity: 1 !important; background: rgba(var(--ov,255,255,255), 0.12); }
+/* Archived sessions are visually muted (dimmed) so the "put away" state
+   reads clearly at a glance when the Archived filter chip is selected -
+   they're still fully clickable/openable, just de-emphasized. */
+.session-item.archived { opacity: 0.55; }
+.session-item.archived:hover,
+.session-item.archived.active { opacity: 0.9; }
+.session-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 4px 12px 8px;
+}
+.session-filter-select {
+  width: 100%;
+  background: rgba(var(--ov,255,255,255), 0.06);
+  border: 1px solid rgba(var(--ov,255,255,255), 0.1);
+  color: var(--ct-bcabbc,#bcabbc);
+  border-radius: 6px;
+  font-size: 12px;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.filter-chip {
+  background: rgba(var(--ov,255,255,255), 0.06);
+  border: 1px solid rgba(var(--ov,255,255,255), 0.1);
+  color: var(--ct-bcabbc,#bcabbc);
+  border-radius: 999px;
+  font-size: 11px;
+  padding: 3px 10px;
+  cursor: pointer;
+  line-height: 1.4;
+}
+.filter-chip:hover { background: rgba(var(--ov,255,255,255), 0.12); }
+.filter-chip.active {
+  background: #4d2f58;
+  border-color: #4d2f58;
+  color: #fff;
+}
+.session-filter-empty {
+  padding: 16px 12px;
+  text-align: center;
+  color: var(--ct-9a9a9a,#9a9a9a);
+  font-size: 12px;
+}
+.session-preview {
+  font-size: 12px;
+  color: var(--ct-bcabbc,#bcabbc);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+.session-item.active .session-preview { color: var(--ct-e4e9ee,#e4e9ee); }
+.session-meta { font-size: 11px; color: var(--ct-a898b2,#a898b2); margin-top: 4px; }
+.session-item.active .session-meta { color: var(--ct-d7e6f2,#d7e6f2); }
+
+/* min-width: 0 is required here: flex items default to min-width: auto, which
+   floors their shrink size at their content's min-content width. A single wide
+   unbreakable message (e.g. a table with nowrap cells) would otherwise force
+   this whole column (and everything nested inside it) to blow out past the
+   viewport instead of clipping/scrolling internally. */
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--slack-main-bg); }
+.empty-state {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--slack-text-secondary);
+}
+/* No explicit height: it must fill the space its flex parent (.main) gives
+   it; a fixed `100vh` would ignore the health strip and push the compose
+   form out of view. */
+.thread-view { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; }
+.thread-header {
+  border-bottom: 1px solid var(--slack-border);
+  color: var(--ct-fff,#fff);
+  position: relative;
+}
+.thread-header a { color: var(--slack-link); font-size: 12px; font-weight: 400; text-decoration: none; }
+.thread-header a:hover { text-decoration: underline; }
+#thread-title { cursor: pointer; }
+#thread-title:hover { text-decoration: underline dotted; }
+
+/* Row 1: title + meta only - kept calm/scannable, no buttons. */
+.thread-header-top {
+  padding: 12px 20px 4px;
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-weight: 700;
+}
+/* Title truncates instead of growing, so a long title can't move
+   .thread-meta (pinned right below). min-width:0 is required for the
+   ellipsis to take effect inside a flex child. */
+#thread-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.thread-meta {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--ct-9aa0a6,#9aa0a6);
+  white-space: nowrap;
+  /* Pinned to the row's right edge and never shrinks, so its position is
+     independent of title length. */
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* Row 2: slim action toolbar - icon+label chips with a real hover state
+   (background + border), a spacer pushing the transient turn-elapsed
+   readout and the overflow menu to the right edge. */
+.thread-header-toolbar {
+  padding: 4px 16px 10px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.header-chip {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  color: var(--ct-ccc,#ccc);
+  font-size: 12px;
+  padding: 5px 9px;
+  cursor: pointer;
+  font-weight: 400;
+}
+.header-chip:hover { background: rgba(var(--ov,255,255,255), 0.1); border-color: var(--slack-border); color: var(--ct-fff,#fff); }
+/* Status dot for the per-thread 👁 Watches chip - same red/green health
+   signal as the global "Watchers" health-strip item (#health-watches),
+   but scoped to *this thread's* watches only (GET /api/watches?thread_ts=
+   ...), so a broken watch tied to the session you're currently looking at
+   is visible without opening the panel, even if every other thread's
+   watches are healthy. Hidden (not just gray) until a poll actually knows
+   this thread has at least one non-done watch, so threads with no
+   watches at all don't show a misleading dot of any color. */
+.header-chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--cb-666,#666);
+  display: none;
+  flex-shrink: 0;
+}
+.header-chip-dot.chip-dot-visible { display: inline-block; }
+.header-chip-dot.chip-dot-ok { background: #4fae8a; }
+.header-chip-dot.chip-dot-bad { background: #e01e5a; }
+/* Count badge counterpart for the per-thread chip, same idea as
+   .health-item-count above but for the narrower chip context. */
+.header-chip-count {
+  font-size: 10px;
+  color: var(--ct-999,#999);
+  background: rgba(var(--ov,255,255,255), 0.1);
+  border-radius: 8px;
+  padding: 0 5px;
+  margin-left: 2px;
+}
+.header-chip-count:empty { display: none; }
+.header-chip-count-bad { background: rgba(224, 30, 90, 0.35); color: var(--ct-ff9b9b,#ff9b9b); }
+.thread-header-toolbar-spacer { flex: 1; }
+.header-overflow-btn {
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  color: var(--ct-ccc,#ccc);
+  font-size: 16px;
+  line-height: 1;
+  padding: 4px 9px;
+  cursor: pointer;
+}
+.header-overflow-btn:hover { background: rgba(var(--ov,255,255,255), 0.1); border-color: var(--slack-border); }
+.thread-overflow-menu {
+  position: absolute;
+  top: 100%;
+  right: 16px;
+  z-index: 20;
+  background: var(--slack-panel, var(--cb-222,#222));
+  border: 1px solid var(--slack-border);
+  border-radius: 6px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  padding: 4px;
+  min-width: 210px;
+}
+.thread-overflow-menu button,
+.thread-overflow-menu a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--ct-eee,#eee);
+  font-size: 13px;
+  font-weight: 400;
+  text-align: left;
+  padding: 7px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+.thread-overflow-menu button:hover,
+.thread-overflow-menu a:hover { background: rgba(var(--ov,255,255,255), 0.1); }
+.session-info-popover {
+  position: absolute;
+  top: 100%;
+  left: 20px;
+  z-index: 20;
+  background: var(--slack-panel, var(--cb-222,#222));
+  border: 1px solid var(--slack-border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  font-weight: 400;
+  color: var(--ct-fff,#fff);
+}
+.session-info-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
+  font-size: 12px;
+}
+.session-info-label { color: var(--ct-bbb,#bbb); min-width: 110px; }
+.session-info-row code {
+  background: rgba(var(--ov,255,255,255), 0.08);
+  padding: 2px 6px;
+  border-radius: 4px;
+  max-width: 320px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.session-info-copy-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 0 2px;
+}
+.note-popover {
+  position: absolute;
+  top: 100%;
+  left: 20px;
+  z-index: 20;
+  background: var(--slack-panel, var(--cb-222,#222));
+  border: 1px solid var(--slack-border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  font-weight: 400;
+  color: var(--ct-fff,#fff);
+  width: 320px;
+}
+.note-popover-label {
+  font-size: 11px;
+  color: var(--ct-bbb,#bbb);
+  margin-bottom: 6px;
+}
+.note-textarea {
+  width: 100%;
+  min-height: 90px;
+  resize: vertical;
+  background: rgba(var(--ov,255,255,255), 0.08);
+  border: 1px solid var(--slack-border);
+  border-radius: 4px;
+  color: var(--ct-fff,#fff);
+  font-size: 13px;
+  font-family: inherit;
+  padding: 6px 8px;
+  box-sizing: border-box;
+}
+.note-popover-status {
+  font-size: 11px;
+  color: var(--ct-8fbf8f,#8fbf8f);
+  min-height: 14px;
+  margin-top: 4px;
+  text-align: right;
+}
+.stop-turn-btn {
+  background: #a52020;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+/* When re-parented into the live "Working..." status bubble (see
+   renderMessages()/applyConversationData() in app.js), sit on its own line
+   below the status text so it's always reachable at the bottom of the
+   bubble the user is already looking at, rather than squeezed inline. */
+.bubble .stop-turn-btn {
+  display: block;
+  margin-top: 8px;
+}
+.turn-elapsed {
+  font-size: 12px;
+  color: var(--ct-999,#999);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.turn-elapsed.turn-elapsed-warning { color: var(--ct-ecb22e,#ecb22e); font-weight: 600; }
+.turn-elapsed.turn-elapsed-critical { color: #e01e5a; font-weight: 700; }
+.stop-turn-btn:hover { background: #c23030; }
+.stop-turn-btn:disabled { opacity: 0.6; cursor: default; }
+
+/* Voice-transcript buttons (Auto-send/Preview/Send to agent) - real Web
+   UI parity with Slack's block-kit buttons, rendered by renderMessages()
+   for any message whose `actions` field (message_store.py's `actions`
+   column) is non-empty. Sits below the bubble text, same placement
+   pattern as .stop-turn-btn above. */
+.msg-transcript-actions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.msg-transcript-action-btn {
+  background: rgba(var(--ov,255,255,255), 0.08);
+  color: inherit;
+  border: 1px solid rgba(var(--ov,255,255,255), 0.2);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.msg-transcript-action-btn:hover { background: rgba(var(--ov,255,255,255), 0.18); }
+
+/* Inline image previews (see renderMessages() in app.js) for Slack image
+   attachments captured by handlers.py's maybe_capture_images(). Same
+   placement pattern as .msg-transcript-actions above, consistent visual
+   weight with .unfurl-card below. */
+.msg-attachments {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+.attachment-preview {
+  max-height: 240px;
+  max-width: 100%;
+  border-radius: 8px;
+  border: 1px solid rgba(var(--ov,255,255,255), 0.15);
+  cursor: pointer;
+  display: block;
+}
+.attachment-preview:hover { opacity: 0.9; }
+.msg-transcript-action-btn:disabled { opacity: 0.5; cursor: default; }
+
+.retry-last-message-row {
+  display: flex;
+  justify-content: center;
+  padding: 4px 0 12px;
+}
+.retry-last-message-btn {
+  background: #f6f6f6;
+  color: #444;
+  border: 1px solid #d9d9d9;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.retry-last-message-btn:hover { background: #ececec; border-color: #c6c6c6; }
+.queued-badge {
+  margin: 0 12px 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  color: #7a5b00;
+  background: #fff4d6;
+  border: 1px solid #f0d585;
+  border-radius: 4px;
+  align-self: flex-start;
+}
+/* #continue-session-btn is styled by ".thread-overflow-menu button"; this
+   adds the disabled state while continue-in-new-session is in flight. */
+#continue-session-btn:disabled { opacity: 0.6; cursor: default; }
+.messages { flex: 1; overflow-y: auto; overflow-x: hidden; padding: 20px; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+
+/* Message rows: avatar + bubble. User on the right, assistant/system on the left.
+   Avatar aligns to the TOP of the bubble (like Slack), not the bottom.
+   min-width: 0 is required on flex children so long unbreakable content
+   (e.g. wide tables) scrolls/wraps WITHIN the row instead of blowing out
+   the flex layout width and pushing rows off-screen. */
+.msg-row { display: flex; align-items: flex-start; gap: 8px; max-width: 100%; min-width: 0; }
+.msg-row.role-user { flex-direction: row-reverse; align-self: flex-end; }
+.msg-row.role-assistant, .msg-row.role-system { align-self: flex-start; }
+
+/* Full-width layout: every row spans the thread; avatar on the left, a small
+   meta line (time + bookmark) ABOVE a 100%-wide bubble. Placement is by grid
+   areas so DOM order (user: bubble, avatar) doesn't matter. */
+.msg-row, .msg-row.role-user, .msg-row.role-assistant, .msg-row.role-system {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-areas: "avatar time bm" "bubble bubble bubble";
+  column-gap: 6px;
+  row-gap: 2px;
+  align-self: stretch;
+  width: 100%;
+}
+.msg-row > .avatar { grid-area: avatar; width: auto; height: auto; background: none; font-size: 14px; align-self: center; }
+.msg-row > .bubble { grid-area: bubble; max-width: 100%; width: 100%; }
+.msg-row > .msg-hover-time { grid-area: time; justify-self: start; opacity: 0.7; padding: 0; }
+.msg-row > .msg-bookmark-btn { grid-area: bm; justify-self: end; }
+
+/* Message timestamp in the hover-reveal row (next to the bookmark button).
+   Also the "copy deep link" control: clicking copies the link and flashes
+   "✅ Copied" in place of the time. */
+.msg-hover-time {
+  background: none;
+  border: none;
+  font: inherit;
+  font-size: 11px;
+  color: var(--slack-text-secondary, var(--ct-9aa0a6,#9aa0a6));
+  align-self: center;
+  white-space: nowrap;
+  opacity: 0;
+  cursor: pointer;
+  padding: 2px 4px;
+  transition: opacity 0.15s;
+}
+.msg-row:hover .msg-hover-time { opacity: 0.6; }
+.msg-hover-time:hover { opacity: 1 !important; text-decoration: underline; }
+
+/* Brief highlight flash applied to the target row of a deep link once
+   scrolled into view - fades back out automatically after ~2s. */
+.msg-row-deep-link-highlight .bubble {
+  animation: msg-deep-link-flash 2s ease-out;
+}
+@keyframes msg-deep-link-flash {
+  0% { box-shadow: 0 0 0 2px #e0b64c; }
+  100% { box-shadow: 0 0 0 0 transparent; }
+}
+
+/* Bookmark/star a specific message. Unlike the deep-link
+   button, this one stays visible once starred (msg-bookmark-btn-active)
+   so bookmarked messages are recognizable at a glance without hovering. */
+.msg-bookmark-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 4px;
+  align-self: center;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.msg-row:hover .msg-bookmark-btn { opacity: 0.5; }
+.msg-bookmark-btn:hover { opacity: 1 !important; }
+.msg-bookmark-btn-active { opacity: 1 !important; color: var(--ct-e0b64c,#e0b64c); }
+
+.bookmarks-popover {
+  position: absolute;
+  top: 100%;
+  left: 20px;
+  z-index: 20;
+  background: var(--slack-panel, var(--cb-222,#222));
+  border: 1px solid var(--slack-border);
+  border-radius: 6px;
+  padding: 10px 14px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
+  font-weight: 400;
+  color: var(--ct-fff,#fff);
+  width: 320px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+.bookmarks-popover-label {
+  font-size: 11px;
+  color: var(--ct-bbb,#bbb);
+  margin-bottom: 6px;
+}
+.bookmarks-list { display: flex; flex-direction: column; gap: 4px; }
+.bookmarks-item {
+  text-align: left;
+  background: rgba(var(--ov,255,255,255), 0.06);
+  border: 1px solid var(--slack-border);
+  border-radius: 4px;
+  color: var(--ct-fff,#fff);
+  font-size: 12px;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+.bookmarks-item:hover { background: rgba(var(--ov,255,255,255), 0.14); }
+.bookmarks-empty { font-size: 12px; color: var(--ct-999,#999); padding: 6px 0; }
+
+/* Print-friendly transcript. Triggered by the 🖨️ header
+   button (window.print()). Hide all interactive chrome - sidebar, health
+   strip, header buttons/popovers, compose form, stop/retry/queued
+   controls, per-message hover buttons - and switch from the dark Slack
+   palette to plain black-on-white, since dark backgrounds either print as
+   solid black rectangles or waste toner/ink depending on the printer/PDF
+   renderer. Message bubbles get a simple border instead of a background
+   fill/avatar so a long thread reads like a plain document. */
+@media print {
+  .health-strip,
+  .sidebar,
+  .sidebar-resize-handle,
+  .thread-header,
+  .note-popover,
+  .bookmarks-popover,
+  .session-info-popover,
+  .stop-turn-btn,
+  .queued-badge,
+  .retry-last-message-row,
+  .msg-transcript-actions,
+  .mic-status,
+  .compose-form,
+  .msg-hover-time,
+  .msg-bookmark-btn,
+  .avatar {
+    display: none !important;
+  }
+  html, body {
+    height: auto;
+    overflow: visible;
+    background: #fff;
+    color: #000;
+  }
+  .layout, .main, .thread-view, .messages {
+    display: block;
+    height: auto;
+    overflow: visible;
+    background: #fff;
+    color: #000;
+  }
+  .messages { padding: 0; gap: 10px; }
+  .msg-row {
+    display: block;
+    max-width: 100%;
+    page-break-inside: avoid;
+    margin-bottom: 10px;
+  }
+  .bubble {
+    background: #fff !important;
+    color: #000 !important;
+    border: 1px solid #999;
+    border-radius: 4px;
+    padding: 8px 10px;
+    box-shadow: none !important;
+  }
+  .bubble pre, .bubble code {
+    background: #f2f2f2 !important;
+    color: #000 !important;
+  }
+  .bubble a { color: #000; text-decoration: underline; }
+}
+
+/* Live in-progress-turn status row — shown at the bottom of the transcript
+   while the bot is actively working on this conversation's current turn
+   (see get_transcript()'s "live_status"/"running" fields). Mirrors Slack's
+   own ":thinking_face: Working..." status message, which otherwise has no
+   equivalent in the Web UI since in-progress turns aren't in the turns
+   table yet. */
+.msg-row.role-live .bubble {
+  border: 1px solid var(--slack-border);
+  font-style: italic;
+  color: var(--slack-text-secondary);
+}
+.live-spinner {
+  flex-shrink: 0;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid rgba(var(--ov,255,255,255), 0.2);
+  border-top-color: var(--slack-text-secondary);
+  animation: session-spin 0.8s linear infinite;
+  margin-right: 6px;
+  display: inline-block;
+  vertical-align: middle;
+}
+
+.avatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+.avatar-user { background: var(--cb-454a58,#454a58); }
+.avatar-assistant { background: var(--cb-2c3044,#2c3044); }
+.avatar-system { background: var(--cb-616061,#616061); font-size: 14px; }
+
+.bubble {
+  max-width: 100%;
+  padding: 10px 14px;
+  border-radius: 10px;
+  line-height: 1.55;
+  font-size: 14px;
+  color: var(--slack-text-primary);
+  overflow-x: auto;
+  min-width: 0;
+}
+/* Bubbles containing a table can use more width than plain-text bubbles
+   (so wide tables, e.g. Jira sprint lists, don't wrap columns
+   unnecessarily while space is free), but still bounded - not literally
+   100% of the container, which on an ultrawide/large monitor stretches
+   the table (and its columns) uncomfortably wide/sparse. 1600px is a
+   "one comfortable screen width" cap, wider than the 1200px plain-text
+   cap above but not unbounded.
+   NOTE: no `width: fit-content` here — that let a table's intrinsic
+   (nowrap) width blow past the container instead of being clipped to it,
+   which broke the whole message list layout for wide tables. */
+.bubble:has(table) { max-width: 100%; }
+.bubble.user { background: var(--slack-bubble-user-bg); color: var(--slack-text-primary); }
+.bubble.assistant { background: var(--slack-bubble-assistant-bg); }
+.bubble.system {
+  background: var(--slack-bubble-system-bg);
+  border: 1px solid var(--slack-border);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--slack-text-secondary);
+}
+.bubble p:first-child { margin-top: 0; }
+.bubble p:last-child { margin-bottom: 0; }
+.bubble pre { background: var(--cb-0e1116,#0e1116); padding: 8px; border-radius: 6px; overflow-x: auto; }
+.bubble code {
+  font-family: "SF Mono", Monaco, monospace;
+  font-size: 13px;
+  background: rgba(var(--ov,255,255,255), 0.12);
+  padding: 2px 5px;
+  border-radius: 4px;
+}
+.bubble pre code { background: none; padding: 0; border-radius: 0; }
+/* Code blocks with copy button (enhanceCodeBlocks() in app.js). highlight.js
+   CSS handles token colors; this positions the copy button within the <pre>. */
+.bubble pre.code-block-wrapper { position: relative; }
+.code-copy-btn {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(var(--ov,255,255,255), 0.08);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  padding: 2px 6px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+.bubble pre.code-block-wrapper:hover .code-copy-btn { opacity: 1; }
+/* Integration link preview cards (enhanceLinkPreviews()/renderUnfurlCard()
+   in app.js) - a floating tooltip-style card that follows the mouse
+   pointer while hovering the recognized link, appended to <body> and
+   absolutely positioned (see positionUnfurlCardNearCursor()/
+   wireUnfurlHover()) rather than sitting inline in the message flow.
+   Hidden by default, revealed only on hover, so a long transcript with
+   many linked tickets/MRs doesn't get visually noisy. */
+.unfurl-card {
+  display: none;
+  position: fixed;
+  z-index: 500;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--cb-454a58,#454a58);
+  border-left: 3px solid #6cc7ff;
+  border-radius: 6px;
+  background: var(--cb-23262e,#23262e);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  font-size: 13px;
+  max-width: 320px;
+  pointer-events: auto;
+}
+.unfurl-card.unfurl-card-visible { display: block; }
+/* Lazy-fetch loading placeholder shown at the cursor from the moment a
+   recognized link is first hovered, until /api/unfurl resolves (see
+   wireLazyUnfurl() in app.js) - swapped out for the real card markup in
+   place once the response arrives. */
+.unfurl-card.unfurl-card-spinner.unfurl-card-visible {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 14px;
+}
+.unfurl-spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(var(--ov,255,255,255), 0.25);
+  border-top-color: #6cc7ff;
+  border-radius: 50%;
+  animation: unfurl-spin 0.7s linear infinite;
+}
+@keyframes unfurl-spin { to { transform: rotate(360deg); } }
+/* Row 1: icon + ticket key / MR-pipeline-job number + status emoji(s) -
+   a quick-glance summary that doesn't require reading the full title. */
+.unfurl-card .unfurl-row1 { font-weight: 600; margin-bottom: 3px; display: flex; align-items: center; gap: 6px; }
+.unfurl-card .unfurl-row1 a { color: var(--ct-6cc7ff,#6cc7ff); }
+.unfurl-card .unfurl-status { color: var(--slack-text-secondary, var(--ct-9aa0a6,#9aa0a6)); font-weight: 400; font-size: 12px; }
+/* Row 2: the actual ticket/MR/pipeline title text, wraps independently. */
+.unfurl-card .unfurl-row2 { color: var(--ct-d6d8dd,#d6d8dd); font-size: 12px; }
+/* Project-style cards (MR/pipeline/job): row2 holds the !iid/Pipeline #/Job #
+   link (see cardHtml() in furls.js); same link color as row1 links on other
+   card types. */
+.unfurl-card .unfurl-row2 a { color: var(--ct-6cc7ff,#6cc7ff); }
+/* Repo/project name in row1 of project-style cards (layout: cardHtml() in
+   furls.js). Dim and bold so it reads as a label. */
+.unfurl-card .unfurl-project { color: var(--slack-text-secondary, var(--ct-9aa0a6,#9aa0a6)); font-weight: 600; }
+/* App icon (integration) shown at the start of an unfurl card's title row -
+   small enough to sit inline with the ticket key/MR number text. */
+.unfurl-icon { width: 14px; height: 14px; flex: 0 0 auto; }
+.unfurl-link { text-decoration: underline dotted; text-underline-offset: 3px; }
+.bubble table { border-collapse: collapse; margin: 8px 0; width: auto; max-width: 100%; background: var(--cb-1a1d21,#1a1d21); }
+.bubble th, .bubble td {
+  border: 1px solid var(--cb-454a58,#454a58);
+  padding: 6px 10px;
+  text-align: left;
+  font-size: 13px;
+  color: var(--ct-ffffff,#ffffff);
+  /* Long-text cells must wrap, otherwise the table's intrinsic width
+     exceeds the bubble. overflow-wrap covers single long unbroken tokens
+     (e.g. file paths). */
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+.bubble th { background: var(--cb-3a3f4a,#3a3f4a); font-weight: 700; }
+.bubble tr:nth-child(even) td { background: rgba(var(--ov,255,255,255), 0.03); }
+.bubble a { color: var(--ct-6cc7ff,#6cc7ff); text-decoration: underline; }
+.bubble.system a { color: var(--ct-9fd6ff,#9fd6ff); }
+
+.compose-form { display: flex; gap: 10px; padding: 14px 20px; border-top: 1px solid var(--slack-border); align-items: flex-end; }
+.compose-form textarea {
+  flex: 1;
+  resize: none;
+  border-radius: 8px;
+  border: 1px solid var(--slack-border);
+  background: var(--cb-222529,#222529);
+  color: var(--ct-fff,#fff);
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+  /* Auto-growing textarea (autoGrowComposeText() in app.js): JS sets the
+     height up to this max, beyond which it scrolls. */
+  max-height: 240px;
+  overflow-y: auto;
+}
+.compose-form button {
+  border: none;
+  background: var(--slack-accent);
+  color: #fff;
+  border-radius: 8px;
+  padding: 0 20px;
+  height: 40px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.compose-form button:hover { background: #0b4f80; }
+
+/* Compose row wrapper - gives the floating mic-status pill (see below) a
+   positioning anchor without affecting the form's own layout. */
+.compose-wrap { position: relative; }
+
+/* Mic button (voice messages - see startVoiceRecording()/uploadVoiceMessage()
+   in app.js) shares the compose form's row but is visually distinct from
+   Send - round icon button matching Send's height, sits flush at the
+   bottom of the row (align-items: flex-end above) instead of stretching
+   to the full height of a multi-line textarea. Turns red and pulses while
+   actively recording. */
+.compose-form .mic-btn {
+  background: transparent;
+  border: 1px solid var(--slack-border);
+  color: var(--ct-fff,#fff);
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  font-size: 17px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+.compose-form .mic-btn:hover { background: var(--cb-222529,#222529); }
+.compose-form .mic-btn.mic-btn-recording {
+  background: #a52020;
+  border-color: #a52020;
+  animation: mic-pulse 1.2s ease-in-out infinite;
+}
+@keyframes mic-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+/* Floats just above the compose row instead of pushing it down when
+   recording/uploading starts and stops - avoids the layout jumping every
+   time status text appears/disappears. */
+.mic-status {
+  position: absolute;
+  bottom: 100%;
+  right: 20px;
+  margin-bottom: 8px;
+  background: var(--cb-1a1d21,#1a1d21);
+  border: 1px solid var(--slack-border);
+  border-radius: 6px;
+  padding: 6px 12px;
+  font-size: 12px;
+  color: var(--ct-ddd,#ddd);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  max-width: 320px;
+}
+/* Moving-dots indicator for mic-status (recording/uploading) - see
+   setMicStatus()'s `animated` option in app.js. Each dot bounces with a
+   staggered delay so they visibly cycle instead of the status line
+   looking frozen while the user has no other feedback that anything is
+   happening. */
+.mic-status-dots span {
+  display: inline-block;
+  animation: mic-status-dot-bounce 1.2s infinite;
+}
+.mic-status-dots span:nth-child(2) { animation-delay: 0.2s; }
+.mic-status-dots span:nth-child(3) { animation-delay: 0.4s; }
+@keyframes mic-status-dot-bounce {
+  0%, 80%, 100% { opacity: 0.2; transform: translateY(0); }
+  40% { opacity: 1; transform: translateY(-2px); }
+}
+
+/* ---- Session groups (webui/groups.js) ---- */
+.group-filters { position: relative; padding: 0 12px 8px; }
+.group-filter-row { display: flex; gap: 5px; align-items: center; }
+.group-dropdown-toggle {
+  flex: 1; min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  background: rgba(var(--ov,255,255,255),0.08); border: 1px solid rgba(var(--ov,255,255,255),0.15); color: var(--ct-fff,#fff);
+  border-radius: 6px; font-size: 12px; padding: 3px 8px; cursor: pointer;
+}
+.group-dropdown-menu {
+  position: absolute; left: 12px; right: 12px; top: calc(100% - 6px); z-index: 50; max-height: 50vh; overflow-y: auto;
+  background: var(--cb-2b1d2e,#2b1d2e); border: 1px solid rgba(var(--ov,255,255,255),0.2); border-radius: 8px; padding: 4px;
+  display: flex; flex-direction: column; gap: 2px; box-shadow: 0 6px 20px rgba(0,0,0,0.5);
+}
+.group-dropdown-menu[hidden] { display: none; }
+.group-dropdown-menu .group-chip { max-width: none; width: 100%; justify-content: flex-start; }
+.group-chip {
+  background: rgba(var(--ov,255,255,255),0.05); border: 1px solid rgba(var(--ov,255,255,255),0.1); color: var(--ct-bcabbc,#bcabbc);
+  border-radius: 6px; font-size: 11px; padding: 2px 8px; cursor: pointer; line-height: 1.5;
+  border-left: 3px solid var(--group-color, rgba(var(--ov,255,255,255),0.15)); max-width: 160px;
+  display: inline-flex; align-items: center; gap: 4px;
+}
+.group-chip:hover { background: rgba(var(--ov,255,255,255),0.12); }
+.group-chip.active { background: #4d2f58; border-color: #4d2f58; color: #fff; border-left-color: var(--group-color, #fff); }
+.group-chip.drag-over { outline: 2px dashed #fff; }
+.group-chip-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.group-chip-count { opacity: 0.65; font-size: 10px; }
+.group-chip-action { border-left-width: 1px; }
+.group-status-dot { font-size: 8px; line-height: 1; }
+.group-status-dot.status-running { animation: group-pulse 1.2s infinite; }
+@keyframes group-pulse { 50% { opacity: 0.35; } }
+.group-header {
+  display: flex; align-items: center; gap: 6px; padding: 6px 12px; cursor: pointer; font-size: 12px; font-weight: 600;
+  background: rgba(0,0,0,0.18); border-left: 4px solid var(--group-color, var(--cb-666,#666)); color: var(--ct-e8dce8,#e8dce8); user-select: none;
+}
+.group-header:hover { background: rgba(0,0,0,0.3); }
+.group-header.drag-over { box-shadow: inset 0 0 0 2px #fff; }
+.group-header-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.group-header-btn { background: none; border: none; color: inherit; cursor: pointer; opacity: 0.6; padding: 0 3px; }
+.group-header-btn:hover { opacity: 1; }
+.session-item.grouped { border-left: 3px solid var(--group-color, transparent); }
+.session-item.group-master .session-title::before { content: '★ '; color: var(--ct-e0b43c,#e0b43c); }
+.session-group-tag { color: var(--group-color, var(--ct-bbb,#bbb)); font-weight: 600; }
+.session-group-tag .gd { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 4px; vertical-align: baseline; }
+.group-banner {
+  display: flex; align-items: center; gap: 8px; padding: 6px 16px; font-size: 12px; flex-wrap: wrap;
+  background: rgba(var(--ov,255,255,255),0.04); border-left: 4px solid var(--group-color, var(--cb-666,#666)); border-bottom: 1px solid var(--slack-border);
+}
+.group-banner-label { flex: 1; min-width: 160px; }
+.group-banner-count { opacity: 0.6; margin-left: 6px; }
+.group-banner-btn {
+  background: rgba(var(--ov,255,255,255),0.08); border: 1px solid rgba(var(--ov,255,255,255),0.15); color: inherit; border-radius: 5px;
+  padding: 2px 9px; cursor: pointer; font-size: 11px;
+}
+.group-banner-btn:disabled { opacity: 0.3; cursor: default; }
+.group-banner-btn:not(:disabled):hover { background: rgba(var(--ov,255,255,255),0.18); }
+.ctx-menu {
+  position: fixed; z-index: 10000; min-width: 220px; max-width: 320px; background: var(--cb-2b2d31,#2b2d31); color: var(--ct-d1d2d3,#d1d2d3);
+  border: 1px solid var(--cb-4a4d52,#4a4d52); border-radius: 8px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); padding: 6px; font-size: 13px;
+}
+.ctx-title { padding: 4px 8px; font-weight: 600; opacity: 0.8; }
+.ctx-search { width: 100%; margin: 2px 0 4px; padding: 4px 8px; background: var(--cb-1a1d21,#1a1d21); color: inherit; border: 1px solid var(--cb-4a4d52,#4a4d52); border-radius: 5px; }
+.ctx-list { max-height: 220px; overflow-y: auto; }
+.ctx-item { display: flex; align-items: center; gap: 6px; width: 100%; text-align: left; background: none; border: none; color: inherit; padding: 5px 8px; border-radius: 5px; cursor: pointer; font-size: 13px; }
+.ctx-item:hover { background: #2f6fae; color: #fff; }
+.ctx-item.current { font-weight: 700; }
+.ctx-dot { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.ctx-sep { height: 1px; background: var(--cb-4a4d52,#4a4d52); margin: 4px 0; }
+.ctx-empty { padding: 6px 8px; opacity: 0.6; }
+.group-overview { padding: 20px 28px; overflow-y: auto; height: 100%; border-top: 4px solid var(--group-color, var(--cb-666,#666)); }
+.group-overview h2 { margin: 0 0 6px; }
+.group-overview h3 { margin: 18px 0 6px; font-size: 14px; }
+.group-overview .ov-title { cursor: text; }
+.ov-header { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.ov-header h2 { flex: 1; }
+.ov-desc { opacity: 0.85; margin: 4px 0; }
+.ov-desc-empty { opacity: 0.5; cursor: pointer; }
+.ov-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.ov-table th { text-align: left; opacity: 0.6; font-weight: 500; }
+.ov-table td, .ov-table th { padding: 5px 8px; border-bottom: 1px solid var(--slack-border); }
+.ov-row { cursor: pointer; }
+.ov-row:hover { background: rgba(var(--ov,255,255,255),0.06); }
+.ov-empty { opacity: 0.55; }
+.ov-cols { display: flex; gap: 40px; flex-wrap: wrap; }
+.ov-timeline { list-style: none; padding: 0; margin: 0; font-size: 13px; }
+.ov-timeline li { padding: 2px 0; }
+.ov-select { background: var(--cb-1a1d21,#1a1d21); color: inherit; border: 1px solid var(--cb-4a4d52,#4a4d52); border-radius: 4px; margin-left: 8px; }
+.status-pill { font-size: 11px; padding: 1px 7px; border-radius: 999px; background: rgba(var(--ov,255,255,255),0.08); }
+
+/* Muted pin/archive buttons: emoji ignore `color`, so desaturate them. */
+.session-pin-btn, .session-archive-btn { filter: grayscale(1) brightness(1.1); }
+.session-item:hover .session-pin-btn, .session-item:hover .session-archive-btn { opacity: 0.55; }
+.session-pin-btn:hover, .session-archive-btn:hover { filter: grayscale(0.3); }
+
+/* Calm & quiet: neutral palette, colour only as a tiny group dot; actions on hover. */
+.session-item .session-archive-btn, .session-item .session-pin-btn { opacity: 0; }
+.session-item:hover .session-archive-btn, .session-item:hover .session-pin-btn { opacity: 0.55; }
+.session-item.pinned .session-pin-btn { opacity: 0.55; }
+.session-turn-count-long { color: inherit; font-weight: 600; text-decoration: underline dotted; }
+.group-chip, .group-chip-action { border-left-width: 1px; }
+.session-item.long-session { border-left-color: transparent; }
+
+.session-item.reorder-before { box-shadow: inset 0 3px 0 0 #fff; }
+.session-item.reorder-after { box-shadow: inset 0 -3px 0 0 #fff; }
+
+/* ---- Watcher-noise views (Today / Smart / Messages only) ----
+   "Calm & quiet": grays only; blue only for links; red only for failures. */
+.view-seg { display: inline-flex; border: 1px solid var(--cb-35373b,#35373b); border-radius: 6px; overflow: hidden; margin-left: 8px; }
+.view-seg button { background: none; border: 0; color: var(--ct-8f9194,#8f9194); font: inherit; font-size: 12px; padding: 3px 10px; cursor: pointer; }
+.view-seg button.on { background: var(--cb-3a3d42,#3a3d42); color: var(--ct-d1d2d3,#d1d2d3); }
+.watch-indent { margin-left: 40px; align-self: flex-start; max-width: 92%; }
+.watch-chip { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--ct-8f9194,#8f9194); background: var(--cb-1f2227,#1f2227);
+  border: 1px solid var(--cb-35373b,#35373b); border-radius: 999px; padding: 2px 10px; cursor: default; list-style: none; }
+.watch-chip-type { color: var(--ct-d1d2d3,#d1d2d3); font-weight: 500; }
+.watch-chip-time { opacity: 0.65; }
+.watch-chip-fail { border-color: #6a2f2b; }
+.watch-group > summary { cursor: pointer; }
+.watch-group > summary::-webkit-details-marker { display: none; }
+.watch-group > summary::before { content: "▸"; font-size: 10px; margin-right: 4px; }
+.watch-group[open] > summary::before { content: "▾"; }
+.watch-group-inner { margin: 5px 0 2px 10px; padding-left: 10px; border-left: 2px solid var(--cb-35373b,#35373b); display: flex; flex-direction: column; gap: 4px; }
+.watch-group-reply { padding-left: 12px; font-size: 12px; font-style: italic; color: var(--ct-8f9194,#8f9194); opacity: 0.85; }
+.bubble.bubble-fail { box-shadow: inset 3px 0 0 #e5534b; }
+.digest-card { align-self: stretch; max-width: none; margin-right: 0; border: 1px solid var(--cb-4a4d52,#4a4d52); border-radius: 10px; background: var(--cb-1c1f23,#1c1f23); }
+.digest-head { display: flex; gap: 10px; align-items: center; padding: 7px 12px; border-bottom: 1px solid var(--cb-35373b,#35373b); font-size: 12px; color: var(--ct-8f9194,#8f9194); flex-wrap: wrap; }
+.digest-head b { color: var(--ct-d1d2d3,#d1d2d3); font-size: 13px; }
+.digest-seg { margin-left: auto; }
+.digest-body { padding: 8px 12px; font-size: 13px; }
+.digest-sec { margin: 6px 0 2px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ct-8f9194,#8f9194); }
+.digest-body ul { margin: 2px 0; padding-left: 18px; }
+.digest-body li { margin: 2px 0; }
+.digest-body a { color: var(--ct-6cc7ff,#6cc7ff); }
+.digest-folded { margin-top: 6px; font-size: 12px; color: var(--ct-8f9194,#8f9194); }
+.digest-foot { padding: 6px 12px; border-top: 1px solid var(--cb-35373b,#35373b); display: flex; gap: 14px; }
+.digest-foot button { background: none; border: 0; color: var(--ct-8f9194,#8f9194); font: inherit; font-size: 12px; cursor: pointer; padding: 0; }
+.digest-foot button:hover { color: var(--ct-d1d2d3,#d1d2d3); }
+.watch-chip-click { cursor: pointer; }
+.watch-chip-click:hover, .watch-chip-open { border-color: var(--cb-565856,#565856); color: var(--ct-d1d2d3,#d1d2d3); }
+.watch-preview { margin: 6px 0 4px; display: flex; flex-direction: column; gap: 6px; max-width: 100%; }
+.watch-preview .bubble { max-width: 100%; }
+
+/* Slides view for long assistant messages */
+.slides { display: flex; gap: 14px; outline: none; }
+.slides-pane { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.slides-body { overflow: auto; max-height: 70vh; }
+.slides-slide[hidden] { display: none; }
+.slides-all-mode .slides-slide { margin-bottom: 14px; }
+.slides-rail { width: 150px; flex: none; margin: 0; padding: 0; list-style: none; }
+.slides-rail-item { display: flex; align-items: baseline; gap: 6px; padding: 5px 8px; margin-bottom: 3px; line-height: 1.25; border: 1px solid var(--slack-border); border-radius: 6px; font-size: 13px; color: var(--slack-text-secondary); cursor: pointer; }
+.slides-rail-item:hover { background: var(--slack-bubble-user-bg); }
+.slides-rail-item.cur { background: var(--slack-accent); border-color: var(--slack-accent); color: #fff; }
+.slides-nav { display: flex; align-items: center; gap: 8px; margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--slack-border); font-size: 12px; color: var(--slack-text-secondary); }
+.slides-btn { background: var(--slack-bubble-user-bg); color: var(--slack-text-primary); border: 1px solid var(--slack-border); border-radius: 6px; padding: 3px 10px; cursor: pointer; font: inherit; }
+.slides-btn:hover:not(:disabled) { background: var(--slack-accent); }
+.slides-btn:disabled { opacity: 0.35; cursor: default; }
+.header-chip-off { opacity: 0.55; }
+@media (max-width: 700px) {
+  .slides-with-rail { flex-direction: column; gap: 8px; }
+  .slides-rail { width: auto; display: flex; gap: 6px; overflow-x: auto; }
+  .slides-rail-item { white-space: nowrap; margin-bottom: 0; }
+}
+
+/* more room: slide bubbles take the full row; rail is collapsible */
+.msg-row:has(.bubble-slides) { width: 100%; }
+.bubble.bubble-slides { flex: 1; max-width: 100%; min-width: 0; }
+.slides-rail-hidden .slides-rail { display: none; }
+.slides-rail-item { font-size: 12.5px; }
+
+/* Messages inbox (sidebar mode + main-pane slides) — see inbox.js */
+.sidebar-modes { display: flex; gap: 4px; flex: 1; margin-right: 10px; }
+.sidebar-mode { flex: 1; background: transparent; border: 1px solid var(--slack-sidebar-border); color: var(--ct-cfc3cf,#cfc3cf); border-radius: 6px; padding: 3px 8px; font: inherit; font-size: 13px; cursor: pointer; }
+.sidebar-mode:hover { background: var(--slack-sidebar-hover); }
+.sidebar-mode.active { background: var(--slack-sidebar-active); border-color: var(--slack-sidebar-active); color: #fff; }
+.inbox-badge { background: rgba(var(--ov,255,255,255),0.18); color: var(--ct-e8dde8,#e8dde8); border-radius: 9px; padding: 0 6px; font-size: 11px; font-weight: 600; margin-left: 4px; }
+body.inbox-mode .sidebar-search, body.inbox-mode #session-filters, body.inbox-mode #group-filters, body.inbox-mode #session-list { display: none !important; }
+body.inbox-mode #inbox-list { display: block !important; }
+.inbox-filters { padding: 6px 12px 8px; }
+.inbox-count { font-size: 11px; border-radius: 8px; padding: 0 7px; background: rgba(var(--ov,255,255,255), 0.18); color: var(--ct-fff,#fff); flex: none; }
+.inbox-count.ready { background: #2d5a4a; }
+.inbox-unread-head { font-size: 11px; text-transform: uppercase; letter-spacing: .04em; color: var(--ct-cfc3cf,#cfc3cf); opacity: 0.6; padding: 10px 12px 2px; }
+.inbox-unread-item { opacity: 0.8; }
+.inbox-empty-side { color: var(--ct-cfc3cf,#cfc3cf); opacity: 0.7; padding: 14px 12px; font-size: 13px; }
+.inbox-view { flex: 1; overflow: auto; padding: 18px 26px 40px; }
+.inbox-card { max-width: 920px; margin: 0 auto; background: var(--slack-bubble-assistant-bg); border: 1px solid var(--slack-border); border-radius: 8px; padding: 12px 16px; }
+.inbox-head { display: flex; align-items: baseline; gap: 8px; }
+.inbox-title { font-size: 16px; color: var(--ct-fff,#fff); }
+.inbox-why { color: var(--slack-text-secondary); font-size: 13px; margin: 4px 0 10px; }
+.inbox-ctx { margin: 0 0 10px; padding: 8px 12px; background: var(--cb-15181c,#15181c); border-radius: 8px; font-size: 13px; max-height: 40vh; overflow: auto; }
+.inbox-chips { display: flex; gap: 5px; flex-wrap: wrap; margin-bottom: 8px; }
+.inbox-chips .slides-rail-item { margin: 0; padding: 2px 9px; }
+.inbox-chips .slides-rail-item.done { border-color: #3f8a6c; }
+.inbox-slide { margin-bottom: 12px; }
+.inbox-send:not(:disabled) { background: var(--slack-accent); border-color: var(--slack-accent); color: #fff; }
+.inbox-empty { text-align: center; padding: 90px 0; color: var(--slack-text-secondary); }
+.inbox-empty-icon { font-size: 38px; }
+#inbox-toast { position: fixed; bottom: 18px; left: 50%; transform: translateX(-50%); background: var(--cb-111,#111); border: 1px solid var(--slack-border); padding: 8px 16px; border-radius: 8px; opacity: 0; transition: opacity 0.2s; pointer-events: none; z-index: 60; color: var(--slack-text-primary); }
+#inbox-toast.on { opacity: 1; pointer-events: auto; }
+#inbox-toast .lnk { margin-left: 12px; background: none; border: 0; color: var(--slack-link); cursor: pointer; font: inherit; }
+/* ask widget normally lives in a popover; inline in the inbox it needs no floating chrome */
+.inbox-slide .ask-body { max-width: 680px; }
+
+/* Voice setup banner (missing Whisper/ffmpeg) - see showVoiceSetupBanner() in app.js */
+.voice-setup-banner {
+  position: absolute; bottom: 100%; left: 20px; right: 20px; margin-bottom: 8px;
+  background: var(--cb-1a1d21,#1a1d21); border: 1px solid #d9a441; border-radius: 8px;
+  padding: 10px 12px; font-size: 13px; z-index: 20;
+}
+.voice-setup-head { display: flex; justify-content: space-between; align-items: center; font-weight: 600; margin-bottom: 6px; }
+.voice-setup-close { background: none; border: 0; color: inherit; font-size: 18px; cursor: pointer; line-height: 1; }
+.voice-setup-row { margin-bottom: 6px; }
+.voice-setup-cmd { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
+.voice-setup-cmd code { flex: 1; overflow-x: auto; white-space: nowrap; padding: 4px 6px; background: rgba(255,255,255,.08); border-radius: 4px; }
+.voice-setup-copy { cursor: pointer; }
+.voice-setup-foot { opacity: .7; font-size: 12px; }

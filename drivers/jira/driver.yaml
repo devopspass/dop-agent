@@ -1,0 +1,48 @@
+# Package driver: Jira Cloud. CLI + watcher scripts + skill template; all watchers (one ticket, JQL) are script watches.
+# Nothing site-specific is built in: base URL, account and token file are per-instance config
+# (config.yaml -> integrations.<name>; base_url under `base_url:`, the rest under `options:`).
+# The API token is never put in config or skills: `token_file` points to a file that holds it.
+id: jira
+title: Jira Cloud
+type: package
+icon: jira
+auth:
+  types:
+    token_file: { title: "API token read from a file (no secret in config)", fields: {} }
+settings:
+  base_url: { required: true, example: "https://<site>.atlassian.net" }
+options:
+  email:        { type: string, required: true, pattern: '[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+',
+                  help: "Atlassian account email the API token belongs to" }
+  token_file:   { type: string, required: true, pattern: '[A-Za-z0-9._/~\-]+',
+                  help: "Path of a file containing the Jira API token (e.g. ~/.dop-agent/secrets/jira-token, chmod 600)" }
+  sp_field:     { type: string, default: "", pattern: '(customfield_[0-9]{1,8})?',
+                  help: "Story-points field id; empty = auto-detect by name" }
+  sprint_field: { type: string, default: "", pattern: '(customfield_[0-9]{1,8})?',
+                  help: "Sprint field id; empty = auto-detect" }
+  title:        { type: string, pattern: '[^"`$\\<>]{0,80}', help: "Short label for lists and the skill description (default: the email)" }
+cli:
+  entry: cli/cli.py
+  global_args: ["--base-url", "${{config.base_url}}", "--email", "${{config.email}}", "--token-file", "${{config.token_file}}"]
+env:
+  JIRA_BASE_URL: "${{config.base_url}}"
+  JIRA_EMAIL: "${{config.email}}"
+  JIRA_TOKEN_FILE: "${{config.token_file}}"
+skill:
+  template: skill/SKILL.md.tmpl
+  name: jira
+watchers:
+  jira-assigned:     { script: jira_watch.py, args: [jql, "assignee = currentUser() AND resolution = Unresolved"], emoji: "📥", slack_emoji: ":inbox_tray:", title: "Unresolved issues assigned to me: newly assigned or updated" }
+  jira-ticket:       { script: jira_watch.py, args: [ticket], emoji: "🎫", slack_emoji: ":ticket:", title: "One issue: new comments, status changes, field changes (add the key; --match/--author filter comments)" }
+  jira-jql:          { script: jira_watch.py, args: [jql], emoji: "🔎", slack_emoji: ":mag:", title: "New or updated issues matching a JQL (add the JQL)" }
+status_sets:              # Jira statuses are free-form: best-effort cosmetic emoji, keys are lower-cased names
+  workflow: { "to do": "📋", open: "📋", backlog: "📋", "in progress": "🔄", "in review": "👀", "code review": "👀",
+              "selected for sprint": "🗂️", "ready to progress": "🗂️", done: "✅", closed: "✅", resolved: "✅",
+              blocked: "🚫" }
+kinds:
+  ticket:
+    status_set: workflow
+    url_match: '^{base_url}/browse/(?P<key>[A-Z][A-Z0-9]+-\d+)/?$'
+    url_template: '{base_url}/browse/{key}'
+    card: { fields: [key, summary, status, assignee], icon: jira, label: '{key}' }
+version: 2

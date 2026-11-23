@@ -1,0 +1,2 @@
+Vendored, pinned (no CDN at runtime):
+marked 12.0.2 (lib/marked.umd.js), dompurify 3.1.6, emoji-js 3.7.0, highlight.js 11.9.0 (+github-dark css), mermaid 11.4.1 (UMD min), chart.js (chart.umd.min.js)
