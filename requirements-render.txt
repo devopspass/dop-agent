@@ -5,7 +5,7 @@
 # obligations before distributing or offering the combined work as a network
 # service. The core install does not include it.
 weasyprint==70.0
-pymupdf==1.28.2
+pymupdf==2.1
 pillow==13.0.0
 markdown==3.11.3
 nh3==0.3.8
