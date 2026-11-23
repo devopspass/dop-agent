@@ -70,7 +70,7 @@ class _Cdp:
                 return msg.get("result", {})
 
     def eval(self, expression):
-        return self.call("Runtime.evaluate", expression=expression, returnByValue=True) \
+        return self.call("Runtime.evaluate", expression=expression, returnByValue=True, awaitPromise=True) \
             .get("result", {}).get("value")
 
     def close(self):
@@ -86,12 +86,33 @@ def _is_teams(tab):
 
 
 _EXPR = """
-  (() => {
+  (async () => {
     const tokens = [], accounts = {};
+    const b64 = s => Uint8Array.from(atob(s.replace(/-/g, '+').replace(/_/g, '/')), c => c.charCodeAt(0));
+    // MSAL >=4 encrypts cache entries ({id, nonce, data}); the key lives in the msal.cache.encryption cookie
+    let base = null;
+    try {
+      const m = document.cookie.match(/(?:^|; )msal\\.cache\\.encryption=([^;]*)/);
+      if (m) base = await crypto.subtle.importKey('raw', b64(JSON.parse(decodeURIComponent(m[1])).key), 'HKDF', false, ['deriveKey']);
+    } catch (e) {}
+    // the HKDF info is the client id for token entries (key part 5) and empty for account entries
+    const dec = async (v, info) => {
+      const key = await crypto.subtle.deriveKey({name: 'HKDF', hash: 'SHA-256', salt: b64(v.nonce), info: new TextEncoder().encode(info)},
+        base, {name: 'AES-GCM', length: 256}, false, ['decrypt']);
+      const pt = await crypto.subtle.decrypt({name: 'AES-GCM', iv: new Uint8Array(12)}, key, b64(v.data));
+      return JSON.parse(new TextDecoder().decode(pt));
+    };
+    const parse = async (raw, k) => {
+      const v = JSON.parse(raw);
+      if (!(v && v.nonce && v.data && base)) return v;
+      const infos = [(k.split('|')[4] || ''), ''];
+      for (const info of infos) { try { return await dec(v, info); } catch (e) {} }
+      return null;
+    };
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
       try {
-        const v = JSON.parse(localStorage.getItem(k));
+        const v = await parse(localStorage.getItem(k), k);
         if (v && v.credentialType === 'AccessToken') tokens.push(v);
         else if (v && v.username && v.homeAccountId) accounts[v.homeAccountId] = v.username;
       } catch (e) {}
