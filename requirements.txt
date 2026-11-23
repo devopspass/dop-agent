@@ -12,7 +12,7 @@ websocket-client==1.9.2
 fastapi==0.163.1
 uvicorn[standard]==0.54.0
 itsdangerous==2.2.0
-mcp==1.30.0
+mcp==2.3.0
 # security floors (pip-audit)
 cryptography>=50.0.2
 certifi>=2026.11.20
