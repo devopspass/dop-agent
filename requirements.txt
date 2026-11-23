@@ -1,6 +1,6 @@
 # Core runtime dependencies (pinned). Optional extras: requirements-render.txt,
 # requirements-voice.txt, requirements-dev.txt.
-github-copilot-sdk==1.0.34
+github-copilot-sdk==1.0.35
 slack-bolt==1.30.0
 aiohttp==3.14.5
 python-dotenv==1.2.4
