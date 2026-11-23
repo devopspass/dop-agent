@@ -14,7 +14,7 @@
 # container refuses to start without it. WEB_UI_HOST=0.0.0.0 is set INSIDE the container only; publish the port
 # on 127.0.0.1 (see docker-compose.yml). The Web UI's Host-header allow-list accepts 127.0.0.1/localhost/[::1]
 # on :10818; for any other hostname/port mapping add it to WEB_UI_ALLOWED_HOSTS (comma separated host:port).
-FROM python:3.12-slim
+FROM python:3.15-slim
 
 ARG INSTALL_RENDER=0
 ARG INSTALL_VOICE=0
